@@ -15,7 +15,9 @@ mkdir -p "$SYSTEM_KNOWLEDGE_DIR"
 # Iterate through all folders in the repo knowledge directory
 for agent_dir in "$REPO_KNOWLEDGE_DIR"/*/; do
     if [ -d "$agent_dir" ]; then
-        agent_name=$(basename "$agent_dir")
+        # Remove trailing slash
+        agent_dir_clean="${agent_dir%/}"
+        agent_name=$(basename "$agent_dir_clean")
         target_link="$SYSTEM_KNOWLEDGE_DIR/$agent_name"
 
         echo "📦 Deploying agent: $agent_name"
@@ -26,8 +28,8 @@ for agent_dir in "$REPO_KNOWLEDGE_DIR"/*/; do
         fi
 
         # Create the symlink
-        ln -s "$agent_dir" "$target_link"
-        echo "✅ Linked: $target_link -> $agent_dir"
+        ln -s "$agent_dir_clean" "$target_link"
+        echo "✅ Linked: $target_link -> $agent_dir_clean"
     fi
 done
 

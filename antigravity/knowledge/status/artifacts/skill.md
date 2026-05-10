@@ -11,11 +11,11 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
    - If you cannot ask (non-interactive) and docs are ambiguous, fall back to English.
 
 2. **Gather information** by reading the project thoroughly:
-   - Read all documentation files in `docs/` (requirements, architecture, playbook, etc.)
+   - Read all documentation files in `docs/` (PRDs under `docs/prd/`, architecture, playbook, etc.)
    - Read `package.json` for dependencies and scripts
    - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.)
    - Read key source files to understand what's implemented
-   - Check `.gemini/GEMINI.md` if it exists for project instructions
+   - Check `CLAUDE.md` if it exists for project instructions
    - Run `git log --oneline -20` to see recent development activity
    - Run `git diff --stat HEAD~5` (or similar) to see what areas changed recently
 
@@ -29,7 +29,7 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
 
 4. **Write `docs/status.md`** with the following structure (translate all section headers and content into the determined working language):
 
-```
+```markdown
 # Project Status
 
 > Auto-generated project status summary.

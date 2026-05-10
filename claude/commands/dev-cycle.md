@@ -8,7 +8,13 @@ You are the orchestrator of one autonomous development iteration. Execute the fo
 
 ## Setup
 
-First, read `docs/loop-state.md` if it exists to understand the current iteration number and any carry-over context from the previous cycle. If it doesn't exist, this is iteration 1.
+First, check if the user specified a **target PRD** (e.g., `dev-cycle prd-008`). If they did, this cycle is **scoped** — all phases only work against that single PRD file (`docs/prd/prd-008-*.md`). If no target is specified, the cycle works against all active PRDs.
+
+Throughout these instructions:
+- **Scoped mode**: replace every mention of "active PRDs under docs/prd/" with the specific target PRD file path. Subagent prompts must name the exact file so agents don't wander into unrelated PRDs.
+- **Unscoped mode**: use all active PRDs as before.
+
+Next, read `docs/loop-state.md` if it exists to understand the current iteration number and any carry-over context from the previous cycle. If it doesn't exist, this is iteration 1.
 
 Read `docs/prd/index.md` and `docs/architecture.md` to orient yourself.
 
@@ -48,7 +54,7 @@ Return a summary of what tasks were scheduled and how many parallel groups
 there are."
 ```
 
-If planner reports nothing left to do (all CUJs implemented and tests passing), proceed to Phase 6 (Final Evaluation) instead.
+If planner reports nothing left to do (all CUJs in scope implemented and tests passing), proceed to Phase 6 (Final Evaluation) instead.
 
 ---
 
@@ -154,6 +160,6 @@ Status: <continue | done | blocked>
 
 ## Exit Conditions
 
-- **Status = `done`**: Report to the user that all CUJs are implemented and verified. List what was accomplished across all iterations. Stop the loop.
+- **Status = `done`**: Report to the user that all CUJs in scope are implemented and verified. List what was accomplished across all iterations. Stop the loop.
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.
 - **Status = `continue`**: Report the iteration summary (tasks done, test results, what remains). The loop continues to the next iteration.

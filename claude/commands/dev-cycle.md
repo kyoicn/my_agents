@@ -1,5 +1,5 @@
 ---
-description: Run one iteration of the autonomous development loop. Orchestrates tech-lead, planner, task execution, qa, status, and pm agents in sequence. Updates docs/loop-state.md with iteration progress.
+description: Run one iteration of the autonomous development loop. Orchestrates tl, planner, task execution, qa, status, and pm agents in sequence. Updates docs/loop-state.md with iteration progress.
 ---
 
 # Dev Cycle — One Iteration
@@ -16,7 +16,7 @@ Read `docs/prd/index.md` and `docs/architecture.md` to orient yourself.
 
 ## Phase 1: Architecture Review
 
-Spawn a `tech-lead` subagent:
+Spawn a `tl` subagent:
 
 ```
 Prompt: "Review the current project state and update docs/architecture.md.
@@ -30,7 +30,7 @@ a summary of:
 3. Any blockers that require user input before work can proceed"
 ```
 
-If tech-lead reports a **blocker requiring user input**, stop the loop, update `docs/loop-state.md` with status `blocked`, and notify the user with the blocker details.
+If tl reports a **blocker requiring user input**, stop the loop, update `docs/loop-state.md` with status `blocked`, and notify the user with the blocker details.
 
 ---
 
@@ -110,7 +110,7 @@ to be done."
 
 ## Phase 7: Final Evaluation
 
-Spawn a `tech-lead` subagent:
+Spawn a `tl` subagent:
 
 ```
 Prompt: "Review docs/prd/index.md, active PRDs under docs/prd/,

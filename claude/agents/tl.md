@@ -1,5 +1,5 @@
 ---
-name: tech-lead
+name: tl
 description: Expert software architect that deeply understands the project's codebase and design, answers technical questions, proposes optimal solutions for target features, and maintains the canonical architecture document (docs/architecture.md).
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch, AskUserQuestion
 model: opus

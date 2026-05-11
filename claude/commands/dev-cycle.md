@@ -55,7 +55,7 @@ the next round of tasks. Read docs/prd/index.md and active PRDs under
 docs/prd/, all files under docs/design/, docs/status.md, and docs/qa-report.md
 (if it exists — qa failures and fabrications MUST become fix tasks with
 highest priority). Prioritize in this order:
-1. Fix QA FABRICATION items (fake data, console.log stubs, unexecuted pipelines)
+1. Fix QA FABRICATION items (fake data, no-op stubs, unexecuted pipelines)
 2. Fix QA FAIL items (bugs and regressions)
 3. Implement the highest-value unfinished CUJs
 Never schedule new feature work if unresolved QA FAIL items exist.
@@ -88,7 +88,34 @@ After all groups complete:
 3. If a merge conflict occurs:
    - Attempt automatic resolution for trivial conflicts (import additions, non-overlapping changes)
    - For non-trivial conflicts, note the conflict in loop-state.md and attempt resolution by reading both changes and combining them
-4. After all merges, run `npx tsc --noEmit` to verify the combined code compiles. If it fails, fix compilation errors before proceeding.
+4. After all merges, run the project's compilation/type-check command (e.g., `npx tsc --noEmit`, `cargo check`, `go build ./...`, `python -m py_compile`) to verify the combined code compiles. If it fails, fix compilation errors before proceeding.
+
+---
+
+### Phase 3.6: Code Review
+
+Spawn a `tl` subagent:
+
+```
+Prompt: "Conduct a code quality review of all changes made in this
+iteration. Use git diff to identify changed files. Execute your
+code review checklist (Section 4 of your role definition):
+- Type safety: run the project's type checker, search for weak type annotations
+- Architecture: verify framework rules, state management patterns
+- Security: check for hardcoded secrets, open CORS, missing auth
+- Performance: check for unthrottled I/O, N+1 queries, missing virtualization
+- Configuration: check for hardcoded values that should be constants
+- Guideline compliance: if any docs/*-guidelines.md files exist, verify
+  all changed code complies
+
+Fix simple, unambiguous issues directly (unused imports, type annotations,
+hardcoded values → constants). For design-level issues, flag them but do
+not modify the code.
+
+Produce a code review summary and commit any fixes you made."
+```
+
+If TL finds critical issues that could not be auto-fixed, note them in `docs/loop-state.md`. These will be picked up by QA as part of the overall quality assessment.
 
 ---
 

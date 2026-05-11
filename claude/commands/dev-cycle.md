@@ -16,7 +16,7 @@ Throughout these instructions:
 
 Next, read `docs/loop-state.md` if it exists to understand the current iteration number and any carry-over context from the previous cycle. If it doesn't exist, this is iteration 1.
 
-Read `docs/prd/index.md` and `docs/architecture.md` to orient yourself.
+Read `docs/prd/index.md` and all files under `docs/design/` to orient yourself.
 
 ---
 
@@ -25,13 +25,14 @@ Read `docs/prd/index.md` and `docs/architecture.md` to orient yourself.
 Spawn a `tl` subagent:
 
 ```
-Prompt: "Review the current project state and update docs/architecture.md.
+Prompt: "Review the current project state and update docs/design/.
 Focus on: are there design gaps relative to the PRDs? Are there
-architectural decisions that need to be made before the next round of
+design decisions that need to be made before the next round of
 implementation? Read docs/prd/index.md, active PRDs under docs/prd/,
-docs/status.md, and the codebase. Update docs/architecture.md and return
-a summary of:
-1. What architectural decisions were made or updated
+all files under docs/design/, docs/status.md, and the codebase.
+Update the appropriate design docs (system.md for cross-cutting,
+design-<slug>.md for component-specific) and return a summary of:
+1. What design decisions were made or updated
 2. What constraints the planner should know about
 3. Any blockers that require user input before work can proceed"
 ```
@@ -47,7 +48,7 @@ Spawn a `planner` subagent:
 ```
 Prompt: "Based on the current project state, update docs/tasks.md with
 the next round of tasks. Read docs/prd/index.md and active PRDs under
-docs/prd/, docs/architecture.md, docs/status.md, and docs/qa-report.md
+docs/prd/, all files under docs/design/, docs/status.md, and docs/qa-report.md
 (if it exists — qa failures should become tasks). Prioritize: fixing
 failing tests first, then implementing the highest-value unfinished CUJs.
 Return a summary of what tasks were scheduled and how many parallel groups
@@ -120,7 +121,7 @@ Spawn a `tl` subagent:
 
 ```
 Prompt: "Review docs/prd/index.md, active PRDs under docs/prd/,
-docs/status.md, docs/qa-report.md, and docs/architecture.md. Assess:
+docs/status.md, docs/qa-report.md, and all files under docs/design/. Assess:
 are all CUJs in active PRDs implemented and verified by passing tests?
 Are there any architectural issues that must be resolved? Return one of
 three verdicts:

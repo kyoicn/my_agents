@@ -168,7 +168,8 @@ Example:
 
 Before proposing anything, thoroughly examine:
 - `docs/prd/index.md` and `docs/prd/*.md` — existing PRDs
-- All other docs (`docs/architecture.md`, `docs/status.md`, etc.)
+- All design docs under `docs/design/` (`system.md`, `design-*.md`)
+- `docs/status.md` and other docs
 - `package.json` and key source files — understand what's actually built
 - `git log --oneline -20` — recent development direction
 - Any `CLAUDE.md` files for project context

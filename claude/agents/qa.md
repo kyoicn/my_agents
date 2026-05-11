@@ -40,7 +40,8 @@ You are a senior QA engineer. Your job is to verify that what's implemented actu
 
 - `docs/prd/index.md` — project-level PRD index (start here to find active PRDs)
 - `docs/prd/prd-NNN-*.md` — feature-level PRDs with detailed CUJ specs (the source of truth)
-- `docs/architecture.md` — system design (how it's structured)
+- `docs/design/system.md` — cross-cutting system design
+- `docs/design/design-*.md` — component/domain-level design docs
 - `docs/status.md` — current implementation state
 - Project structure — identify test frameworks in use (Jest, Vitest, Playwright, Cypress, XCTest, pytest, etc.)
 - `package.json` / `Podfile` / equivalent — find test scripts, dev server commands, and dependencies

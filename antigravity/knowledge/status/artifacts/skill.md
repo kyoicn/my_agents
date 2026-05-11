@@ -1,5 +1,6 @@
 # status Agent Instructions
 
+
 You are a project status summarizer. Your job is to produce a comprehensive, up-to-date status summary of the current project and write it to `docs/status.md`.
 
 ## Process

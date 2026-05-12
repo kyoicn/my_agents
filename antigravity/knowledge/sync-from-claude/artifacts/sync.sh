@@ -24,28 +24,58 @@ sync_item() {
     # Create directory if it doesn't exist
     mkdir -p "$target_dir/artifacts"
 
-    # Extract content (strip YAML frontmatter)
-    # This sed command deletes from the first line until the second occurrence of '---'
-    sed '1,/^---$/d' "$src" > "$target_file"
-
-    # Add header
+    # Add header and type logic
     local header_type="Agent"
     [[ "$type" == "commands" ]] && header_type="Command"
-    
-    if ! head -n 1 "$target_file" | grep -q "^# $name $header_type Instructions"; then
-        echo -e "# $name $header_type Instructions\n\n$(cat "$target_file")" > "$target_file"
+
+    # 1. Extract description for metadata summary
+    # Using | as delimiter for sed to avoid issues with slashes in descriptions
+    local summary=$(grep "^description:" "$src" | sed 's/^description: //' | sed 's/^"//;s/"$//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    if [[ -z "$summary" ]]; then
+        summary="Custom $(echo $header_type | tr '[:upper:]' '[:lower:]') definitions for $name."
     fi
 
-    # Update metadata.json updated_at
+    # 2. Extract content (strip YAML frontmatter)
+    sed '1,/^---$/d' "$src" > "$target_file"
+
+    # 3. Inject Antigravity-specific tool mappings and aesthetic guidelines
+    local extra_instructions="
+## Antigravity Environment & Tools
+You are running in the Antigravity environment. Use the following tool mappings:
+- **Bash** -> \`run_command\`
+- **Read** -> \`view_file\`
+- **Grep** -> \`grep_search\`
+- **Glob** -> \`list_dir\`
+- **Write** -> \`write_to_file\`
+- **Edit** -> \`replace_file_content\` or \`multi_replace_file_content\`
+- **WebSearch** -> \`search_web\`
+- **WebFetch** -> \`read_url_content\` or \`read_browser_page\`
+
+### Advanced Tools
+- **generate_image**: Use this to create high-quality UI mockups, icons, and assets.
+- **browser_subagent**: Use this for interactive browser tasks, visual debugging, and testing.
+
+### Aesthetic Standards
+Every UI you design or review must follow **Antigravity Rich Aesthetics**:
+- Use vibrant, curated color palettes (not defaults).
+- Prioritize visual excellence and premium feel.
+- Use modern typography (e.g., Inter, Outfit).
+- Implement smooth gradients, micro-animations, and hover effects.
+"
+
+    # Prepend header and extra instructions
+    echo -e "# $name $header_type Instructions\n$extra_instructions\n$(cat "$target_file")" > "$target_file"
+
+    # 4. Update or Create metadata.json
     if [[ -f "$metadata" ]]; then
-        # Only update updated_at if file exists
-        sed -i '' "s/\"updated_at\": \".*\"/\"updated_at\": \"$NOW\"/" "$metadata"
+        # Use | as delimiter to handle slashes in summary
+        sed "s|\"summary\": \".*\"|\"summary\": \"$summary\"|" "$metadata" > "$metadata.tmp" && mv "$metadata.tmp" "$metadata"
+        sed "s|\"updated_at\": \".*\"|\"updated_at\": \"$NOW\"|" "$metadata" > "$metadata.tmp" && mv "$metadata.tmp" "$metadata"
     else
-        # Create new metadata.json with stable created_at
         cat > "$metadata" <<EOF
 {
   "title": "$name",
-  "summary": "Custom $(echo $header_type | tr '[:upper:]' '[:lower:]') definitions for $name.",
+  "summary": "$summary",
   "created_at": "$NOW",
   "updated_at": "$NOW"
 }

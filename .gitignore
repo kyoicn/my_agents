@@ -1,0 +1,14 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Environment and local configs
+.env
+.env.local
+.direnv/

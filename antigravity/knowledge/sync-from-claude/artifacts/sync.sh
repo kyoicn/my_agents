@@ -11,6 +11,19 @@ ANTIGRAVITY_DIR="$REPO_ROOT/antigravity/knowledge"
 # Current timestamp for metadata
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# Centralized Tool Mapping Table
+# Format: "ClaudeToolName:AntigravityToolName"
+TOOL_MAPPINGS=(
+    "Bash:run_command"
+    "Read:view_file"
+    "Grep:grep_search"
+    "Glob:list_dir"
+    "Write:write_to_file"
+    "Edit:replace_file_content"
+    "WebSearch:search_web"
+    "WebFetch:read_url_content"
+)
+
 sync_item() {
     local type=$1 # "agents" or "commands"
     local name=$2
@@ -28,45 +41,37 @@ sync_item() {
     local header_type="Agent"
     [[ "$type" == "commands" ]] && header_type="Command"
 
-    # 1. Extract description for metadata summary
+    # 1. Extract description and tools for metadata/header
     # Using | as delimiter for sed to avoid issues with slashes in descriptions
     local summary=$(grep "^description:" "$src" | sed 's/^description: //' | sed 's/^"//;s/"$//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     if [[ -z "$summary" ]]; then
         summary="Custom $(echo $header_type | tr '[:upper:]' '[:lower:]') definitions for $name."
     fi
 
+    local raw_tools=$(grep "^tools:" "$src" | sed 's/^tools: //')
+    local translated_tools="$raw_tools"
+    for mapping in "${TOOL_MAPPINGS[@]}"; do
+        claude_tool="${mapping%%:*}"
+        antigravity_tool="${mapping#*:}"
+        # Mac sed uses [[:<:]] and [[:>:]] for word boundaries
+        translated_tools=$(echo "$translated_tools" | sed "s/[[:<:]]$claude_tool[[:>:]]/$antigravity_tool/g")
+    done
+
     # 2. Extract content (strip YAML frontmatter)
     sed '1,/^---$/d' "$src" > "$target_file"
 
-    # 3. Inject Antigravity-specific tool mappings and aesthetic guidelines
-    local extra_instructions="
-## Antigravity Environment & Tools
-You are running in the Antigravity environment. Use the following tool mappings:
-- **Bash** -> \`run_command\`
-- **Read** -> \`view_file\`
-- **Grep** -> \`grep_search\`
-- **Glob** -> \`list_dir\`
-- **Write** -> \`write_to_file\`
-- **Edit** -> \`replace_file_content\` or \`multi_replace_file_content\`
-- **WebSearch** -> \`search_web\`
-- **WebFetch** -> \`read_url_content\` or \`read_browser_page\`
+    # 3. Perform tool name replacement (Claude -> Antigravity) in the body
+    for mapping in "${TOOL_MAPPINGS[@]}"; do
+        claude_tool="${mapping%%:*}"
+        antigravity_tool="${mapping#*:}"
+        # Using [[:<:]] and [[:>:]] for Mac compatibility
+        sed -i '' "s/[[:<:]]$claude_tool[[:>:]]/$antigravity_tool/g" "$target_file"
+    done
 
-### Advanced Tools
-- **generate_image**: Use this to create high-quality UI mockups, icons, and assets.
-- **browser_subagent**: Use this for interactive browser tasks, visual debugging, and testing.
+    # 4. Add minimal header with Tool Capabilities
+    echo -e "# $name $header_type Instructions\n\n**Tool Capabilities**: $translated_tools\n\n$(cat "$target_file")" > "$target_file"
 
-### Aesthetic Standards
-Every UI you design or review must follow **Antigravity Rich Aesthetics**:
-- Use vibrant, curated color palettes (not defaults).
-- Prioritize visual excellence and premium feel.
-- Use modern typography (e.g., Inter, Outfit).
-- Implement smooth gradients, micro-animations, and hover effects.
-"
-
-    # Prepend header and extra instructions
-    echo -e "# $name $header_type Instructions\n$extra_instructions\n$(cat "$target_file")" > "$target_file"
-
-    # 4. Update or Create metadata.json
+    # 5. Update or Create metadata.json
     if [[ -f "$metadata" ]]; then
         # Use | as delimiter to handle slashes in summary
         sed "s|\"summary\": \".*\"|\"summary\": \"$summary\"|" "$metadata" > "$metadata.tmp" && mv "$metadata.tmp" "$metadata"

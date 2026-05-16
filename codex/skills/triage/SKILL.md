@@ -3,6 +3,8 @@ name: "triage"
 description: "Diagnose reported issues, assess scope, identify root cause, and recommend a resolution path (quick-fix vs. dev-cycle). Reads from docs/issues.md or takes a direct issue description."
 ---
 
+<!-- generated-from: claude/commands -->
+
 # triage
 
 Use this skill when the user asks to run `triage`.
@@ -53,9 +55,9 @@ Classify as one of three scopes:
 
 | Scope | Criteria | Resolution path |
 |-------|----------|-----------------|
-| **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
-| **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
-| **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
+| **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `quick-fix` |
+| **medium** | Multiple files but no design change, may need QA verification | `quick-fix` (with QA follow-up) |
+| **large** | Cross-component, design implications, needs architectural review | `dev-cycle` |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -75,13 +77,13 @@ For each issue, print a structured diagnosis:
 **Related CUJ**: CUJ-<ID> (<PRD file>)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle
+**Recommended action**: quick-fix | quick-fix + QA | dev-cycle
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
 For large-scope issues, additionally explain:
 - What design decisions are affected
-- Why `/quick-fix` is insufficient
+- Why `quick-fix` is insufficient
 - What the dev-cycle should focus on
 
 ### 4. Update docs/issues.md

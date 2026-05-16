@@ -42,7 +42,7 @@ Quickly orient yourself:
 
 **d) Assess scope**
 
-Classify as one of four scopes:
+Classify as one of five scopes:
 
 | Scope | Criteria | Resolution path |
 |-------|----------|-----------------|
@@ -50,6 +50,7 @@ Classify as one of four scopes:
 | **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
 | **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
 | **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/user:pm` (define the feature first) |
+| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → update PRD, report wrong → close as invalid) |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -58,6 +59,7 @@ Key questions for scope assessment:
 - Does it reveal a design flaw that needs rethinking?
 - Is the existing spec sufficient, or does the PRD need updating?
 - Is this actually a missing feature rather than a bug? If no CUJ defines the expected behavior, it's a spec-gap.
+- Does the reported "expected behavior" directly contradict what the PRD specifies? If so, it's a spec-conflict — don't assume either side is correct.
 
 ### 3. Output diagnosis
 
@@ -66,11 +68,11 @@ For each issue, print a structured diagnosis:
 ```
 ## Issue: <one-line summary>
 
-**Scope**: small | medium | large | spec-gap
+**Scope**: small | medium | large | spec-gap | spec-conflict
 **Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /user:pm
+**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /user:pm | ask user
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
@@ -83,6 +85,12 @@ For spec-gap issues, additionally explain:
 - What behavior the user expects that no CUJ currently defines
 - What questions PM needs to answer before implementation can start
 - Whether this is a net-new feature or an extension of an existing CUJ
+
+For spec-conflict issues, additionally explain:
+- What the PRD specifies (quote the relevant CUJ step or acceptance criterion)
+- What the report claims the behavior should be
+- The current implementation (does it follow the PRD or not?)
+- Do NOT decide which side is correct — present both and ask the user to resolve
 
 ### 4. Update docs/issues.md
 
@@ -100,7 +108,7 @@ After:
 
 The format is: `<description> — **<scope>** → `/<action>` — <CUJ> (<PRD>) — <root cause location>`
 
-Where `<action>` is one of: `/quick-fix`, `/quick-fix` + QA, `/dev-cycle`, `/user:pm`.
+Where `<action>` is one of: `/quick-fix`, `/quick-fix` + QA, `/dev-cycle`, `/user:pm`, `ask user`.
 
 Keep it one line per issue. The detail is in the diagnosis output, not in the file.
 

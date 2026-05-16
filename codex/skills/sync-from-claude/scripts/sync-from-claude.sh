@@ -2,9 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CODEX_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(cd "$CODEX_DIR/.." && pwd)"
 CLAUDE_DIR="$REPO_ROOT/claude"
-CODEX_DIR="$REPO_ROOT/codex"
 
 if [[ ! -d "$CLAUDE_DIR" ]]; then
   echo "Error: source directory not found: $CLAUDE_DIR" >&2
@@ -29,6 +29,7 @@ claude_dir = Path(os.environ["CLAUDE_DIR"])
 codex_dir = Path(os.environ["CODEX_DIR"])
 agents_dir = codex_dir / "agents"
 skills_dir = codex_dir / "skills"
+managed_skill_marker = "<!-- generated-from: claude/commands -->"
 
 
 def parse_markdown(path: Path):
@@ -108,6 +109,8 @@ def write_skill(src: Path):
                 f"description: {json.dumps(description, ensure_ascii=False)}",
                 "---",
                 "",
+                managed_skill_marker,
+                "",
                 f"# {name}",
                 "",
                 f"Use this skill when the user asks to run `{src.stem}`.",
@@ -123,12 +126,19 @@ def write_skill(src: Path):
     print(f"  SKILL {name} -> {target.relative_to(codex_dir)}")
 
 
-for generated_dir in (agents_dir, skills_dir):
-    if generated_dir.is_symlink() or generated_dir.is_file():
-        generated_dir.unlink()
-    elif generated_dir.exists():
-        shutil.rmtree(generated_dir)
-    generated_dir.mkdir(parents=True, exist_ok=True)
+if agents_dir.is_symlink() or agents_dir.is_file():
+    agents_dir.unlink()
+elif agents_dir.exists():
+    shutil.rmtree(agents_dir)
+agents_dir.mkdir(parents=True, exist_ok=True)
+
+if skills_dir.is_symlink() or skills_dir.is_file():
+    skills_dir.unlink()
+skills_dir.mkdir(parents=True, exist_ok=True)
+
+for skill_file in skills_dir.glob("*/SKILL.md"):
+    if managed_skill_marker in skill_file.read_text(encoding="utf-8"):
+        shutil.rmtree(skill_file.parent)
 
 for src in sorted((claude_dir / "agents").glob("*.md")):
     write_agent(src)

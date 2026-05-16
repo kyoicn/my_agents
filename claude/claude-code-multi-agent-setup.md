@@ -6,6 +6,7 @@ This document describes a complete multi-agent setup for Claude Code that enable
 
 This setup creates a team of specialized AI agents that collaborate in an autonomous development loop:
 
+**Feature development (full pipeline):**
 ```
 User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
                                                     │
@@ -13,6 +14,14 @@ User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
                                                     │
                                           Parallel worktree agents
                                           execute tasks concurrently
+```
+
+**Bug fixes (lightweight pipeline):**
+```
+Issue ──► /triage (diagnose + scope) ──► /quick-fix (small) ──► commit
+  │         │                       └──► /dev-cycle  (large)
+  │         │
+  └── docs/issues.md (intake inbox)
 ```
 
 ### The agents
@@ -25,9 +34,9 @@ User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
 | `qa` | QA engineer — runs tests, writes missing tests, manually verifies CUJs, reports coverage | `docs/qa-report.md` |
 | `status` | Status reporter — summarizes current project state | `docs/status.md` |
 
-### The workflow
+### The workflows
 
-**Manual mode:**
+**Feature development (manual):**
 ```
 /user:pm "define the feature"       → writes docs/prd/prd-NNN-<slug>.md
 /user:tl                            → writes docs/design/
@@ -36,11 +45,19 @@ User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
 /user:qa                            → writes docs/qa-report.md
 ```
 
-**Autonomous mode:**
+**Feature development (autonomous):**
 ```
 /user:pm "define the feature"       → align on requirements first
 /loop /dev-cycle                    → runs the full loop autonomously until done or blocked
 ```
+
+**Bug fixes:**
+```
+/triage "describe the issue"        → diagnoses root cause, assesses scope, recommends action
+/quick-fix "describe the issue"     → triages + fixes small-scope issues directly
+```
+
+Issues can also be written to `docs/issues.md` as a persistent intake inbox. `/triage` reads from it when invoked without arguments.
 
 ### Key design decisions
 
@@ -50,6 +67,8 @@ User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
 4. **Working language detection**: All agents detect the project's working language from existing `docs/` files and write in that language. Technical terms are preserved as-is.
 5. **PRDs organized by feature, design docs organized by engineering domain**: PM writes CUJ-driven PRDs per product feature. TL writes design docs per engineering component/subsystem. Multiple PRDs may feed into one design doc; one PRD may require updates to multiple design docs. This decoupling prevents artificial 1:1 constraints.
 6. **Design docs as one coherent body**: All files in `docs/design/` form a single comprehensive engineering design document — individual files are chapters. `system.md` covers cross-cutting concerns; `design-<slug>.md` files cover component-specific design. The TL always reads ALL design docs before making changes to maintain consistency.
+7. **Separate pipelines for features vs. bugs**: Feature work flows through the full PM → TL → Planner → Execute → QA pipeline. Bug fixes use a lightweight triage → quick-fix path that bypasses PRDs and design docs (the spec isn't wrong, the code is). Large bugs that reveal design flaws are escalated to the full pipeline.
+8. **Issues inbox, not issue tracker**: `docs/issues.md` is a write-only intake queue — anyone can jot down a problem. Triage diagnoses entries and routes them. Resolved entries are removed. History lives in git log, not in the inbox.
 
 ---
 
@@ -66,7 +85,9 @@ User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
 │   ├── qa.md                    # QA / testing agent
 │   └── status.md                # Status reporter agent
 └── commands/
-    └── dev-cycle.md             # Autonomous loop command (one iteration)
+    ├── dev-cycle.md             # Autonomous loop command (one iteration)
+    ├── triage.md                # Issue diagnosis and scope assessment
+    └── quick-fix.md             # Small-scope bug fix
 ```
 
 ---
@@ -1470,6 +1491,265 @@ Status: <continue | done | blocked>
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.
 - **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, what remains). The loop continues to the next iteration.
 ```
+
+---
+
+## 9. Issues Inbox: `docs/issues.md`
+
+`docs/issues.md` is a lightweight intake queue for bug reports and defects from any source. It is NOT a full issue tracker — it's an inbox that gets emptied as issues are resolved.
+
+### Who writes to it
+
+| Source | How |
+|--------|-----|
+| You (the developer) | Write a line directly into the file |
+| Other developers | Write a line, or you transcribe from their report |
+| Users / external | Copy the summary from GitHub Issues, support tickets, etc. |
+| QA agent | QA findings flow through `docs/qa-report.md`, not here — this is for issues discovered *outside* the dev-cycle |
+
+### Format
+
+Keep it simple — one line per issue, plain language:
+
+```markdown
+# Issues
+
+Items are removed after they are triaged and resolved.
+
+- Sort order wrong on articles list — noticed while testing reading flow
+- GH#42: Login fails when email contains a plus sign
+- After adding a new source, the count on dashboard doesn't update until refresh
+```
+
+After `/triage` runs, entries get annotated with scope and root cause:
+
+```markdown
+- Sort order wrong on articles list — **small** — CUJ-003 (prd-000) — `src/services/articles.ts:42`
+- GH#42: Login fails when email contains a plus sign — **medium** — CUJ-001 (prd-000) — `src/auth/validate.ts:18`
+- After adding a new source, the count on dashboard doesn't update until refresh — **large** — CUJ-012 (prd-002) — needs design review
+```
+
+### Lifecycle
+
+1. Someone writes an issue into the file
+2. `/triage` diagnoses it (adds scope, root cause, CUJ mapping)
+3. `/quick-fix` fixes small/medium issues and removes the entry
+4. Large issues are escalated to `/dev-cycle` — the entry is removed once the dev-cycle picks it up
+5. History lives in git log (`fix:` commits), not in this file
+
+### Rules
+
+- Do NOT use this as a persistent tracker — resolved items are deleted, not moved to a "done" section
+- Do NOT put feature requests here — those go through PM and PRDs
+- Do NOT duplicate QA findings — bugs found during dev-cycle are already in `docs/qa-report.md`
+- This file may not exist if there are no reported issues — that's fine
+
+---
+
+## 10. Command: Triage (`~/.claude/commands/triage.md`)
+
+This command diagnoses reported issues, assesses their scope, and recommends the right resolution path.
+
+```markdown
+---
+description: Diagnose reported issues, assess scope, identify root cause, and recommend a resolution path (quick-fix vs. dev-cycle). Reads from docs/issues.md or takes a direct issue description.
+---
+
+# Triage
+
+You are diagnosing reported issues to determine their root cause, scope, and the best resolution path. You do NOT fix anything — you analyze and recommend.
+
+## Input
+
+Check how you were invoked:
+- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that single issue.
+- **Without arguments**: Read `docs/issues.md` and diagnose all open entries.
+
+If `docs/issues.md` doesn't exist and no description was provided, tell the user there's nothing to triage.
+
+## Process
+
+### 1. Understand the project context
+
+Quickly orient yourself:
+- Read `docs/prd/index.md` and skim active PRDs for relevant CUJs
+- Read `docs/design/system.md` for architecture context
+- Read `docs/status.md` if it exists
+- Check `docs/qa-report.md` if it exists — the issue may already be documented there
+
+### 2. For each issue, diagnose
+
+**a) Reproduce / Confirm the issue**
+- Read the relevant source code
+- Understand what the code currently does vs. what it should do
+- Identify the specific file(s) and line(s) where the behavior originates
+- If it's a runtime issue and a dev server can be started, start it and verify
+
+**b) Map to requirements**
+- Find which CUJ(s) this issue relates to
+- Determine: is this a deviation from an existing spec, or is the spec itself missing/incomplete?
+
+**c) Identify root cause**
+- Pinpoint the exact cause (wrong logic, missing case, stale data, race condition, etc.)
+- Distinguish between the symptom and the underlying cause
+
+**d) Assess scope**
+
+Classify as one of three scopes:
+
+| Scope | Criteria | Resolution path |
+|-------|----------|-----------------|
+| **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
+| **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
+| **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
+
+Key questions for scope assessment:
+- How many files need to change?
+- Does the fix require changing any interfaces, data models, or APIs?
+- Could the fix break other features?
+- Does it reveal a design flaw that needs rethinking?
+- Is the existing spec sufficient, or does the PRD need updating?
+
+### 3. Output diagnosis
+
+For each issue, print a structured diagnosis:
+
+    ## Issue: <one-line summary>
+
+    **Scope**: small | medium | large
+    **Related CUJ**: CUJ-<ID> (<PRD file>)
+    **Root cause**: <specific explanation — file:line, what's wrong, why>
+    **Files involved**: <list of files that need changes>
+    **Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle
+    **Risk**: <what could go wrong with the fix, regression potential>
+
+For large-scope issues, additionally explain:
+- What design decisions are affected
+- Why `/quick-fix` is insufficient
+- What the dev-cycle should focus on
+
+### 4. Update docs/issues.md
+
+After diagnosing, update each entry in `docs/issues.md` with the triage result. Change from raw description to triaged format:
+
+Before:
+    - Sort order wrong on articles list
+
+After:
+    - Sort order wrong on articles list — **small** — CUJ-003 (prd-000) — `src/services/articles.ts:42`
+
+Keep it one line per issue. The detail is in the diagnosis output, not in the file.
+
+If an issue from `docs/issues.md` turns out to be invalid (not a bug, works as designed, can't reproduce), remove it from the file and explain why in the output.
+
+## What NOT to do
+
+- Don't fix anything — only diagnose and recommend
+- Don't modify source code, tests, or implementation files
+- Don't modify PRD files or design docs
+- Don't create tasks in docs/tasks.md
+- Don't guess at root causes without reading the actual code
+- Don't classify everything as "large" to be safe — be honest about scope
+```
+
+---
+
+## 11. Command: Quick Fix (`~/.claude/commands/quick-fix.md`)
+
+This command fixes small-scope bugs directly — triage, fix, test, commit in one flow.
+
+```markdown
+---
+description: Fix a small-scope issue directly. Triages first (if not already triaged), then implements the fix, runs tests, and commits. For large issues, escalates to /dev-cycle.
+---
+
+# Quick Fix
+
+You are fixing a small-scope issue — a clear bug, spec deviation, or defect that can be resolved in 1-3 files without design changes.
+
+## Input
+
+Check how you were invoked:
+- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that issue.
+- **With a pre-triaged issue** (e.g., `quick-fix ISS-001` or context from a prior `/triage` run): Skip to fix using the existing diagnosis.
+- **Without arguments**: Read `docs/issues.md`, pick the first triaged small/medium-scope entry, and fix it.
+
+## Process
+
+### 1. Triage (if not already done)
+
+If the issue hasn't been triaged yet:
+- Read the relevant source code and CUJs
+- Identify root cause, files involved, and scope
+- If scope is **large**: STOP. Tell the user: "This issue has design implications — recommend using `/dev-cycle` instead." Explain why. Do not attempt the fix.
+
+If the issue was already triaged (from a prior `/triage` run or from a triaged entry in `docs/issues.md`), use that diagnosis but quickly verify it's still accurate by reading the relevant code.
+
+### 2. Plan the fix
+
+Before writing any code:
+- State what you're going to change and why
+- Identify which tests already cover this behavior (if any)
+- Identify whether a new test is needed to prevent regression
+
+### 3. Implement the fix
+
+- Make the minimal change needed to resolve the issue
+- Do not refactor surrounding code
+- Do not add features
+- Do not change interfaces or APIs unless that's the actual bug
+- Follow existing code conventions and patterns
+
+### 4. Test
+
+- Run the project's existing test suite — all tests must still pass
+- If the bug wasn't covered by an existing test, write a focused test that:
+  - Reproduces the original bug (would have failed before the fix)
+  - Verifies the correct behavior (passes after the fix)
+  - Name it clearly: reference the CUJ and the specific behavior
+- Run tests again with the new test included
+
+### 5. Verify
+
+If a dev server can be started and the fix is UI-visible or API-observable:
+- Start the dev server
+- Manually verify the fix works as expected
+- Check that adjacent functionality isn't broken
+
+### 6. Commit
+
+Commit with a conventional commit message:
+
+    fix: <concise description>
+
+    Refs CUJ-<ID> (<prd-file>)
+    <one-line explanation of root cause and what was changed>
+
+### 7. Update docs/issues.md
+
+If the issue came from `docs/issues.md`, remove the entry. The fix is recorded in git history — the inbox doesn't need to track resolved items.
+
+## Scope guard
+
+If at any point during the fix you realize the issue is larger than expected:
+- **You've already touched 3+ files and there's more to do**: Stop. Tell the user the scope expanded and recommend `/dev-cycle`.
+- **The fix requires changing a shared interface or data model**: Stop. This needs TL review.
+- **Fixing this bug would break other features**: Stop. This needs the full pipeline.
+
+Do not push through a large fix just because you started. It's better to stop early and escalate than to produce a half-fix.
+
+## What NOT to do
+
+- Don't attempt large fixes — escalate to `/dev-cycle`
+- Don't refactor or "improve" code beyond what the fix requires
+- Don't modify PRD files or design docs — the spec isn't wrong, the code is
+- Don't skip running tests
+- Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
+- Don't leave stale entries in docs/issues.md after fixing
+```
+
+---
+
 ## Setup Instructions
 
 To replicate this setup on a new machine, ask Claude Code to:
@@ -1487,3 +1767,5 @@ Then verify with:
 - `/user:status` — should generate status report
 - `execute tasks` — main agent should read docs/tasks.md and spawn worktree agents
 - `/loop /dev-cycle` — should run one full autonomous iteration
+- `/triage "test issue"` — should diagnose the issue and recommend a resolution path
+- `/quick-fix "test issue"` — should triage and fix a small-scope issue

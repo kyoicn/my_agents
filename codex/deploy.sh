@@ -13,8 +13,8 @@ echo "Target: $HOME/.codex"
 echo ""
 
 if [[ ! -d "$CODEX_AGENTS_DIR" || ! -d "$CODEX_SKILLS_DIR" ]]; then
-  echo "Generated Codex artifacts are missing. Running sync-from-claude.sh first..."
-  "$SCRIPT_DIR/sync-from-claude.sh"
+  echo "Generated Codex artifacts are missing. Running sync-from-claude skill script first..."
+  "$SCRIPT_DIR/skills/sync-from-claude/scripts/sync-from-claude.sh"
   echo ""
 fi
 

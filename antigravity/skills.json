@@ -1,0 +1,52 @@
+{
+  "skills": [
+    {
+      "name": "pm",
+      "type": "agent",
+      "summary": "Professional PM agent that designs features, proposes improvements, conducts market research, and maintains CUJ-driven PRD documents.",
+      "path": "skills/pm/artifacts/skill.md"
+    },
+    {
+      "name": "planner",
+      "type": "agent",
+      "summary": "Analyze project progress, identify what to work on next, and decompose it into independent parallelizable tasks written to docs/tasks.md.",
+      "path": "skills/planner/artifacts/skill.md"
+    },
+    {
+      "name": "tl",
+      "type": "agent",
+      "summary": "Expert software architect that understands the codebase, answers technical questions, maintains design docs, and conducts code reviews.",
+      "path": "skills/tl/artifacts/skill.md"
+    },
+    {
+      "name": "qa",
+      "type": "agent",
+      "summary": "Quality assurance agent that verifies implemented features against PRD specs through automated tests and manual product verification.",
+      "path": "skills/qa/artifacts/skill.md"
+    },
+    {
+      "name": "status",
+      "type": "agent",
+      "summary": "Summarizes the project's current development status and technical details into docs/status.md.",
+      "path": "skills/status/artifacts/skill.md"
+    },
+    {
+      "name": "dev-cycle",
+      "type": "command",
+      "summary": "Run one iteration of the autonomous development loop, orchestrating all agents in sequence.",
+      "path": "skills/dev-cycle/artifacts/skill.md"
+    },
+    {
+      "name": "sync-from-claude",
+      "type": "command",
+      "summary": "Synchronizes agent and command definitions from the claude/ directory to the antigravity workspace.",
+      "path": "skills/sync-from-claude/artifacts/skill.md"
+    },
+    {
+      "name": "list-mine",
+      "type": "command",
+      "summary": "Lists all available custom agents and commands defined in the workspace.",
+      "path": "skills/list-mine/artifacts/skill.md"
+    }
+  ]
+}

@@ -42,13 +42,14 @@ Quickly orient yourself:
 
 **d) Assess scope**
 
-Classify as one of three scopes:
+Classify as one of four scopes:
 
 | Scope | Criteria | Resolution path |
 |-------|----------|-----------------|
 | **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
 | **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
 | **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
+| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/user:pm` (define the feature first) |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -56,6 +57,7 @@ Key questions for scope assessment:
 - Could the fix break other features?
 - Does it reveal a design flaw that needs rethinking?
 - Is the existing spec sufficient, or does the PRD need updating?
+- Is this actually a missing feature rather than a bug? If no CUJ defines the expected behavior, it's a spec-gap.
 
 ### 3. Output diagnosis
 
@@ -64,11 +66,11 @@ For each issue, print a structured diagnosis:
 ```
 ## Issue: <one-line summary>
 
-**Scope**: small | medium | large
-**Related CUJ**: CUJ-<ID> (<PRD file>)
+**Scope**: small | medium | large | spec-gap
+**Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle
+**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /user:pm
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
@@ -76,6 +78,11 @@ For large-scope issues, additionally explain:
 - What design decisions are affected
 - Why `/quick-fix` is insufficient
 - What the dev-cycle should focus on
+
+For spec-gap issues, additionally explain:
+- What behavior the user expects that no CUJ currently defines
+- What questions PM needs to answer before implementation can start
+- Whether this is a net-new feature or an extension of an existing CUJ
 
 ### 4. Update docs/issues.md
 
@@ -88,8 +95,12 @@ Before:
 
 After:
 ```
-- Sort order wrong on articles list — **small** — CUJ-003 (prd-000) — `src/services/articles.ts:42`
+- Sort order wrong on articles list — **small** → `/quick-fix` — CUJ-003 (prd-000) — `src/services/articles.ts:42`
 ```
+
+The format is: `<description> — **<scope>** → `/<action>` — <CUJ> (<PRD>) — <root cause location>`
+
+Where `<action>` is one of: `/quick-fix`, `/quick-fix` + QA, `/dev-cycle`, `/user:pm`.
 
 Keep it one line per issue. The detail is in the diagnosis output, not in the file.
 

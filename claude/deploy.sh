@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SOURCE_DIR="$SCRIPT_DIR/claude"
+SOURCE_DIR="$SCRIPT_DIR"
 TARGET_DIR="$HOME/.claude"
 
 # Items to symlink: each becomes ~/.claude/<item> -> claude/<item>

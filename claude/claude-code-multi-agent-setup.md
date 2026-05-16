@@ -10,10 +10,21 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 ```
 User ──► PM (requirements) ──► TL (design) ──► Planner (tasks)
                                                     │
-         ◄── PM (review) ◄── Status (report) ◄── QA (test) ◄──┘
-                                                    │
                                           Parallel worktree agents
                                           execute tasks concurrently
+                                                    │
+                                              TL (code review)
+                                                    │
+                                    ┌───────── QA (gate) ──────────┐
+                                    │                              │
+                                  PASS                     FAIL (HIGH/FABRICATION)
+                                    │                  retry up to 2× ──► Planner ──► Execute ──► QA
+                                    ▼
+                              Status (report)
+                                    │
+                              PM (review)
+                                    │
+                              TL (final eval)
 ```
 
 **Bug fixes (lightweight pipeline):**
@@ -42,6 +53,7 @@ Issue ──► /triage (diagnose + scope) ──► /quick-fix (small) ──�
 /user:tl                            → writes docs/design/
 /user:planner                       → writes docs/tasks.md
 "execute tasks"                     → main agent spawns parallel worktree agents
+/user:tl (code review)              → reviews code quality, fixes simple issues
 /user:qa                            → writes docs/qa-report.md
 ```
 

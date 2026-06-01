@@ -126,6 +126,23 @@ Why this journey matters. What user problem does it solve? When does the user en
 - <Scenario>: <What happens — exact error message, recovery path, system behavior>
 - <Scenario>: ...
 
+#### Mocks / Reference Designs
+[needs-mocks] <-- include this flag if mocks have not yet been produced for this CUJ
+
+Mock files are produced **outside the dev loop** (Claude Desktop, Figma, v0, hand-drawn screenshots, etc.) and consumed by QA for visual-fidelity comparison. Do not generate mocks from this agent.
+
+Convention: mock files live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` where:
+- `<prd-dir>` matches this PRD's mockups directory (e.g., `prd-001-mockups/`)
+- `<state>` describes the screen/state (e.g., `initial`, `after-click`, `error`, `empty`)
+- `<ext>` is `.html` (preferred for fidelity — rendered side-by-side by QA), `.png`/`.jpg`/`.webp` (compared as images), or `.md` (treated as additional textual acceptance criteria)
+
+List the mocks that exist (or are planned) for this CUJ:
+- `docs/ux/<prd-dir>/cuj-<id>-initial.html` — initial state
+- `docs/ux/<prd-dir>/cuj-<id>-after-action.html` — state after primary action
+- ...
+
+QA discovers mocks by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}` — you do not need to update QA when adding new files matching the pattern.
+
 #### Acceptance Criteria
 Concrete, testable statements. Each must be verifiable by looking at the running product.
 - [ ] <Criterion — specific, measurable, observable>
@@ -140,6 +157,8 @@ Concrete, testable statements. Each must be verifiable by looking at the running
 - **Specify defaults**: What are the initial values? What happens on first launch? What does an empty state look like?
 - **Specify boundaries**: Max lengths, character limits, truncation behavior, pagination thresholds.
 - **Specify error recovery**: Not just "show an error" — what error, what can the user do about it, does the system retry?
+- **Mocks support the spec, they don't replace it**: even when mocks exist, every Journey Step must be described in prose (action, system response, "user sees"). Mocks are for visual fidelity, not for compensating for vague text.
+- **`[needs-mocks]` is a signal, not a blocker**: marking a CUJ with `[needs-mocks]` does not stop implementation or QA — the loop proceeds, QA records `NO_MOCK` for visual fidelity, and you draw mocks (e.g., in Claude Desktop) before the next iteration if you want fidelity checking.
 
 ### CUJ Dependencies
 

@@ -122,6 +122,23 @@ For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk
 7. **Capture network behavior** where the CUJ specifies it (e.g., "syncs to the server within 5 seconds"): `mcp__playwright__browser_network_requests` — verify the relevant endpoints were hit.
 8. **Close cleanly**: `mcp__playwright__browser_close` between runs and after the second run.
 
+**Visual fidelity comparison against mocks (per Journey Step, both runs):**
+
+Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow a slightly different folder layout — discover by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`).
+
+1. For each CUJ, glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
+2. If zero matches → log `Mocks: NO_MOCK` for this CUJ in the report. Skip fidelity comparison; continue with functional verification only. (Result is unaffected; this is a label, not a failure.)
+3. If matches exist, for each Journey Step that has a corresponding mock (file name matches the step state — e.g., `cuj-3-initial.html` matches step 1's "initial" state), perform a comparison dispatched by extension:
+   - **`.html`** — open the mock in a second browser tab with `mcp__playwright__browser_tab_new` then `browser_navigate` to `file://<absolute mock path>`. Take a screenshot of the mock tab; the implementation screenshot already exists from the Journey Step walk. Save both as `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/<NN>-step-live.png` and `<NN>-step-mock.png`. Use your vision capability to compare the two images side-by-side — check layout, spacing, colors, copy, element presence, hierarchy. Close the mock tab with `mcp__playwright__browser_tab_close`.
+   - **`.png` / `.jpg` / `.webp`** — Read the mock image directly. Compare against the Journey Step screenshot (also a PNG). Same vision-based check.
+   - **`.md`** — Read the markdown file. Treat each statement as an additional textual acceptance criterion. Verify each against `browser_snapshot` output and observed behavior.
+4. Any deviation between implementation and mock is logged as a finding with kind `VISUAL_DEVIATION` and a severity that reflects impact:
+   - `[LOW][VISUAL_DEVIATION]` — minor cosmetic gap (2px misalignment, slightly different shade, swapped icon).
+   - `[MEDIUM][VISUAL_DEVIATION]` — noticeable layout difference, wrong typography, missing decorative element.
+   - `[HIGH][VISUAL_DEVIATION]` — primary action button absent or in wrong place, navigation structure wrong, content hierarchy reversed.
+   - `[CRITICAL][VISUAL_DEVIATION]` — entire screen layout wrong, page renders unusable, copy completely different from mock.
+5. Note: visual deviations are treated as bugs identical to any other — they roll up into the overall verdict the same way, and dev-cycle Phase 4 applies its loop rules to them by severity (LOW only advances; MEDIUM+ retries).
+
 **Flakiness handling — comparing the two runs:**
 - For each Journey Step and Edge Case, compare the per-step outcome between `run1` and `run2`.
 - **Both PASS** → step Result is `PASS`. No finding.
@@ -184,6 +201,10 @@ Scope: <all active PRDs | specific PRD file>
 - Skipped: X
 - Flaky (failed-then-passed on framework retry): X
 
+## Mock Coverage Summary
+- CUJs with mocks compared: X
+- CUJs without mocks (`NO_MOCK`): X (CUJ-<ID>, CUJ-<ID>, ...)
+
 ## Per-CUJ Verification
 
 ### CUJ-<ID>: <title> — PASS | FAIL | BLOCKED | NOT_RUN | WAIVED
@@ -209,6 +230,7 @@ Scope: <all active PRDs | specific PRD file>
 - Console messages (run1): <none | summary of error-level entries>
 - Console messages (run2): <none | summary of error-level entries>
 - Network requests verified: <list, if the CUJ specifies network behavior>
+- Mocks: <list mock file paths compared, OR `NO_MOCK` if none found under docs/ux/>
 - (If `BLOCKED`: state what capability was missing and what was needed.)
 
 #### Issues Found
@@ -312,8 +334,11 @@ Three orthogonal dimensions describe verification state. Use uppercase everywher
 | `REGRESSION` | Previously working; now broken. (Determined by comparing against the prior `docs/qa-report.md` or framework test history.) |
 | `FABRICATION` | Made to look implemented but isn't (hardcoded data, no-op stub, unexecuted pipeline). Severity reflects impact. |
 | `FLAKY` | Inconsistent between the two CUJ runs (one PASS, one FAIL) or failed-then-passed on test-framework retry. Severity reflects impact when it does fail. |
+| `VISUAL_DEVIATION` | Implementation functionally works but diverges from the mock under `docs/ux/`. Severity reflects how much the visual gap matters (a 2px misalignment is LOW; a totally wrong layout is CRITICAL). |
 
-Severity and kind are independent. A `[LOW][FABRICATION]` is a fake tooltip; a `[CRITICAL][FABRICATION]` is a fake payment flow. A `[HIGH][FLAKY]` is an unreliable login; a `[LOW][FLAKY]` is a sometimes-flickering tooltip.
+Severity and kind are independent. A `[LOW][FABRICATION]` is a fake tooltip; a `[CRITICAL][FABRICATION]` is a fake payment flow. A `[HIGH][FLAKY]` is an unreliable login; a `[LOW][VISUAL_DEVIATION]` is a 2px button offset.
+
+**`NO_MOCK` is a label, not a Result or Kind.** It annotates a CUJ whose visual fidelity could not be checked because no mock files exist under `docs/ux/`. It does not change the functional Result and does not appear in the Bugs Found list — it surfaces only in the per-CUJ Artifacts line and the top-level Mock Coverage Summary.
 
 ## Overall verdict — deterministic roll-up
 
@@ -348,4 +373,6 @@ In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop 
 - **Don't silently degrade** — if a required tool is missing, never substitute reading source code or inspecting HTML for a real browser walkthrough. Set Result to `BLOCKED`, fail the gate, and tell the user what to install.
 - **Don't skip the second walk** — every CUJ runs twice. Skipping run2 turns flakes into invisible failures and breaks the gate's honesty.
 - **Don't conflate severity with kind** — fabrication isn't automatically high severity. A fake tooltip is `[LOW][FABRICATION]`; a fake checkout flow is `[CRITICAL][FABRICATION]`. Pick severity by impact.
+- **Don't generate or invent mocks** — mocks are produced outside the loop. If `docs/ux/` has no mock for a CUJ, log `NO_MOCK` and move on. Do not write HTML or sketch a mock to compare against; that defeats the point of fidelity checking.
+- **Don't treat `NO_MOCK` as a failure** — it's informational. A CUJ can be PASS + NO_MOCK; that just means visual fidelity wasn't verified.
 

@@ -23,6 +23,23 @@ For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk
 4. **Verify** every "User sees" assertion from the spec against the subagent's reported observations and screenshots — not against your reading of the source code.
 5. **Stop the dev server** after the second run.
 
+**Visual fidelity comparison against mocks (per Journey Step, both runs):**
+
+Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow a slightly different folder layout — discover by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`).
+
+1. For each CUJ, use `list_dir` / `grep_search` to find files matching `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
+2. If zero matches → log `Mocks: NO_MOCK` for this CUJ in the report. Skip fidelity comparison; continue with functional verification only. (Result is unaffected; this is a label, not a failure.)
+3. If matches exist, include them in your `/browser` brief and instruct the subagent to dispatch by extension:
+   - **`.html`** — open the mock in a separate tab via `file://<absolute mock path>`. Screenshot both the mock tab and the implementation. Save both as `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/<NN>-step-live.png` and `<NN>-step-mock.png`. Compare side-by-side — check layout, spacing, colors, copy, element presence, hierarchy.
+   - **`.png` / `.jpg` / `.webp`** — read the mock image directly and compare against the Journey Step screenshot using the same visual checks.
+   - **`.md`** — read the markdown and treat each statement as an additional textual acceptance criterion; verify each against observed behavior.
+4. Any deviation between implementation and mock is logged as a finding with kind `VISUAL_DEVIATION` and a severity that reflects impact:
+   - `[LOW][VISUAL_DEVIATION]` — minor cosmetic gap (2px misalignment, slightly different shade, swapped icon).
+   - `[MEDIUM][VISUAL_DEVIATION]` — noticeable layout difference, wrong typography, missing decorative element.
+   - `[HIGH][VISUAL_DEVIATION]` — primary action button absent or in wrong place, navigation structure wrong, content hierarchy reversed.
+   - `[CRITICAL][VISUAL_DEVIATION]` — entire screen layout wrong, page renders unusable, copy completely different from mock.
+5. Visual deviations are treated as bugs identical to any other — they roll up into the overall verdict the same way, and dev-cycle Phase 4 applies its loop rules to them by severity.
+
 **Flakiness handling — comparing the two runs:**
 - For each Journey Step and Edge Case, compare the per-step outcome between `run1` and `run2`.
 - **Both PASS** → step Result is `PASS`. No finding.

@@ -2,5 +2,5 @@
   "title": "qa",
   "summary": "Quality assurance agent that verifies implemented features against PRD specs through automated tests and manual product verification. Writes integration/E2E tests, runs the product, walks CUJs in the real UI, and produces a QA report.",
   "created_at": "2026-05-10T13:34:41Z",
-  "updated_at": "2026-06-01T16:11:18Z"
+  "updated_at": "2026-06-01T16:33:45Z"
 }

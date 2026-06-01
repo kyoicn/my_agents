@@ -7,7 +7,7 @@ description: Bootstrap a new project — collect a product brief, drive PRD/CUJ 
 You are the orchestrator for starting a new project. Drive the brief intake, hand off to the `pm` agent for PRD design, and produce a clean handoff artifact for Claude Desktop to consume when drawing mocks.
 
 This skill works in two scenarios:
-- **First PRD in the project** — bootstraps `docs/prd/index.md`, `docs/design/system.md` (stub), and `docs/ux/README.md`.
+- **First PRD in the project** — bootstraps `docs/prd/index.md` and `docs/ux/README.md`.
 - **Subsequent PRDs** — adds the new PRD alongside existing ones, only writes files that don't yet exist.
 
 ## Phase 0: Collect the product brief
@@ -38,11 +38,9 @@ You are designing the PRD for a project. Here is the brief:
 
 Your responsibilities for THIS invocation:
 
-1. **Bootstrap missing scaffolding**: 
-   - If `docs/prd/index.md` does not exist, create it with a product
-     vision section, target user section, and an empty PRD listing.
-   - If `docs/design/system.md` does not exist, create a stub with
-     tech-stack TBD placeholders (the tl agent will fill it later).
+1. **Bootstrap missing PRD scaffolding**: if `docs/prd/index.md` does
+   not exist, create it with a product vision section, target user
+   section, and an empty PRD listing.
 
 2. **Research**: WebSearch for prior art, competitors, and patterns
    relevant to this product domain. Cite findings briefly.
@@ -118,8 +116,7 @@ Your responsibilities for THIS invocation:
    3. Paste this entire file into the first message.
    4. Claude Desktop will produce one HTML per response. Save each
       into `docs/ux/prd-NNN-<slug>-mockups/` using the exact filename.
-   5. When all mocks are saved, return to Claude Code and run
-      `/dev-cycle` to start iteration 1.
+   5. When all mocks are saved, copy them into the target directory.
    ```
 
    Fill in every <placeholder> with the actual content from the PRD
@@ -186,7 +183,6 @@ QA discovers mocks by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}` �
 2. Open the new `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`.
 3. Paste it into a new conversation in your Claude Desktop **UX Mocks** Project.
 4. Save each HTML response into this directory using the exact filename Claude Desktop names it.
-5. Back in Claude Code: `/dev-cycle` — QA will discover the mocks automatically.
 ````
 
 ## Phase 3: Final handoff to the user
@@ -202,7 +198,6 @@ Next steps:
 1. (First time only) Set up your Claude Desktop "UX Mocks" Project — see docs/ux/README.md.
 2. Open the MOCK_BRIEF.md above and paste it into a new conversation in that Project.
 3. Save each generated HTML into the mockups dir.
-4. Run /dev-cycle to start iteration 1.
 ```
 
 Substitute the actual paths. Do not editorialize — the user has everything they need.
@@ -213,4 +208,3 @@ Substitute the actual paths. Do not editorialize — the user has everything the
 - **Don't draw mocks** — the entire point of MOCK_BRIEF.md is to hand mock production off to Claude Desktop. Do not generate HTML mocks from this skill or from any agent in this repo.
 - **Don't overwrite an existing `docs/ux/README.md`** — only create it if missing. Subsequent `/new-project` runs skip Phase 2.
 - **Don't skip the visual style question in Phase 0** — even "no preference" is a valid answer that gets captured in the MOCK_BRIEF as "use defaults". The designer needs to know they have latitude.
-- **Don't run `/dev-cycle` automatically after this** — the user produces mocks first; rushing into implementation defeats the visual-fidelity flow.

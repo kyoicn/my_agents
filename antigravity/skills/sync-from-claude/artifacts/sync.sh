@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# Get the directory where this script lives
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Get the directory where this script lives.
+# pwd -P resolves through symlinks so the script works whether invoked
+# directly from the repo or from its deployed symlink under
+# ~/.gemini/antigravity/knowledge/.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # The repo root is 4 levels up from antigravity/skills/sync-from-claude/artifacts/
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd -P)"
 
 CLAUDE_DIR="$REPO_ROOT/claude"
 ANTIGRAVITY_DIR="$REPO_ROOT/antigravity/skills"

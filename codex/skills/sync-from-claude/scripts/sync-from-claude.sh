@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CODEX_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-REPO_ROOT="$(cd "$CODEX_DIR/.." && pwd)"
+# Resolve through symlinks (pwd -P) so the script works whether invoked
+# directly from the repo or from its deployed symlink under ~/.codex/skills/.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+CODEX_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
+REPO_ROOT="$(cd "$CODEX_DIR/.." && pwd -P)"
 CLAUDE_DIR="$REPO_ROOT/claude"
 
 if [[ ! -d "$CLAUDE_DIR" ]]; then
@@ -29,7 +31,13 @@ claude_dir = Path(os.environ["CLAUDE_DIR"])
 codex_dir = Path(os.environ["CODEX_DIR"])
 agents_dir = codex_dir / "agents"
 skills_dir = codex_dir / "skills"
+overrides_dir = codex_dir / "skills" / "sync-from-claude" / "overrides"
 managed_skill_marker = "<!-- generated-from: claude/commands -->"
+
+SYNC_BLOCK_RE = re.compile(
+    r"<!-- SYNC:([a-z0-9-]+) -->\n?(.*?)\n?<!-- /SYNC:\1 -->",
+    re.DOTALL,
+)
 
 
 def parse_markdown(path: Path):
@@ -65,8 +73,23 @@ def toml_literal(value: str) -> str:
     return f"'''\n{value}'''"
 
 
+def apply_sync_overrides(body: str) -> str:
+    """Replace each `<!-- SYNC:<name> -->...<!-- /SYNC:<name> -->` block with the
+    contents of overrides/<name>.md if it exists. Otherwise strip only the
+    markers and keep the canonical content."""
+
+    def replace(match: re.Match) -> str:
+        name = match.group(1)
+        override = overrides_dir / f"{name}.md"
+        if override.is_file():
+            return override.read_text(encoding="utf-8").rstrip("\n")
+        return match.group(2)
+
+    return SYNC_BLOCK_RE.sub(replace, body)
+
+
 def codex_body(body: str) -> str:
-    return body.replace("CLAUDE.md", "AGENTS.md")
+    return apply_sync_overrides(body).replace("CLAUDE.md", "AGENTS.md")
 
 
 def write_agent(src: Path):

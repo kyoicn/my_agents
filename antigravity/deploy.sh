@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # Configuration
-REPO_KNOWLEDGE_DIR="$(cd "$(dirname "$0")/knowledge" && pwd)"
+# Source: the repo's `skills/` dir (legacy name was `knowledge/` — directory
+# was renamed locally but Antigravity still reads from ~/.gemini/antigravity/knowledge,
+# so the target path is unchanged).
+REPO_KNOWLEDGE_DIR="$(cd "$(dirname "$0")/skills" && pwd -P)"
 SYSTEM_KNOWLEDGE_DIR="$HOME/.gemini/antigravity/knowledge"
 
 echo "🚀 Deploying Antigravity Knowledge Items (KIs) via symlinks..."

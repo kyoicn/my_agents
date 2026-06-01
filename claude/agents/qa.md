@@ -132,12 +132,14 @@ Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow 
    - **`.html`** — open the mock in a second browser tab with `mcp__playwright__browser_tab_new` then `browser_navigate` to `file://<absolute mock path>`. Take a screenshot of the mock tab; the implementation screenshot already exists from the Journey Step walk. Save both as `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/<NN>-step-live.png` and `<NN>-step-mock.png`. Use your vision capability to compare the two images side-by-side — check layout, spacing, colors, copy, element presence, hierarchy. Close the mock tab with `mcp__playwright__browser_tab_close`.
    - **`.png` / `.jpg` / `.webp`** — Read the mock image directly. Compare against the Journey Step screenshot (also a PNG). Same vision-based check.
    - **`.md`** — Read the markdown file. Treat each statement as an additional textual acceptance criterion. Verify each against `browser_snapshot` output and observed behavior.
-4. Any deviation between implementation and mock is logged as a finding with kind `VISUAL_DEVIATION` and a severity that reflects impact:
+4. **Placeholder regions** — if a mock element's visible text matches the pattern `[<word> placeholder]` (e.g., `[Map placeholder — dark-theme world map]`), treat that region as a placeholder. Verify the implementation renders **something** in approximately the same position and bounds, but do NOT compare its visual content. Record as `Placeholder regions verified by layout: <list>` in the per-CUJ Artifacts section. Do not log placeholder-region differences as `VISUAL_DEVIATION`. Non-placeholder UI (chrome, copy, other panels) is still fidelity-checked normally.
+
+5. Any deviation between non-placeholder regions is logged as a finding with kind `VISUAL_DEVIATION` and a severity that reflects impact:
    - `[LOW][VISUAL_DEVIATION]` — minor cosmetic gap (2px misalignment, slightly different shade, swapped icon).
    - `[MEDIUM][VISUAL_DEVIATION]` — noticeable layout difference, wrong typography, missing decorative element.
    - `[HIGH][VISUAL_DEVIATION]` — primary action button absent or in wrong place, navigation structure wrong, content hierarchy reversed.
    - `[CRITICAL][VISUAL_DEVIATION]` — entire screen layout wrong, page renders unusable, copy completely different from mock.
-5. Note: visual deviations are treated as bugs identical to any other — they roll up into the overall verdict the same way, and dev-cycle Phase 4 applies its loop rules to them by severity (LOW only advances; MEDIUM+ retries).
+6. Note: visual deviations are treated as bugs identical to any other — they roll up into the overall verdict the same way, and dev-cycle Phase 4 applies its loop rules to them by severity (LOW only advances; MEDIUM+ retries).
 
 **Flakiness handling — comparing the two runs:**
 - For each Journey Step and Edge Case, compare the per-step outcome between `run1` and `run2`.

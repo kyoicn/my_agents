@@ -1,6 +1,6 @@
 {
   "title": "new-project",
-  "summary": "Bootstrap a new project — collect a product brief, drive PRD/CUJ design via the pm agent, write a MOCK_BRIEF.md for Claude Desktop to consume for mock production, and seed docs/ux/README.md with the one-time Claude Desktop Project setup.",
+  "summary": "Bootstrap a new project — collect a product brief, drive PRD/CUJ design via the pm agent, write a MOCK_BRIEF.md for an external designer agent to consume, and seed docs/ux/README.md with the designer's operating rules.",
   "created_at": "2026-06-01T15:50:22Z",
-  "updated_at": "2026-06-01T16:33:45Z"
+  "updated_at": "2026-06-01T16:45:53Z"
 }

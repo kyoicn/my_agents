@@ -1,6 +1,6 @@
 ---
 name: "new-project"
-description: "Bootstrap a new project — collect a product brief, drive PRD/CUJ design via the pm agent, write a MOCK_BRIEF.md for Claude Desktop to consume for mock production, and seed docs/ux/README.md with the one-time Claude Desktop Project setup."
+description: "Bootstrap a new project — collect a product brief, drive PRD/CUJ design via the pm agent, write a MOCK_BRIEF.md for an external designer agent to consume, and seed docs/ux/README.md with the designer's operating rules."
 ---
 
 <!-- generated-from: claude/commands -->
@@ -117,15 +117,18 @@ Your responsibilities for THIS invocation:
 
    ## How to use this brief
 
-   1. If you have not yet set up the Claude Desktop "UX Mocks"
-      Project, see `docs/ux/README.md` in this repo for one-time
-      setup instructions.
-   2. Open a new conversation inside your Claude Desktop "UX Mocks"
-      Project.
-   3. Paste this entire file into the first message.
-   4. Claude Desktop will produce one HTML per response. Save each
-      into `docs/ux/prd-NNN-<slug>-mockups/` using the exact filename.
-   5. When all mocks are saved, copy them into the target directory.
+   In a chat agent with filesystem access to this repo (e.g., Claude
+   Desktop), send a prompt like:
+
+   > Please produce mocks for this PRD. First read
+   > `docs/ux/README.md` for your designer rules, then read this brief
+   > at `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`. Produce one
+   > HTML at a time per the rules and save each into
+   > `docs/ux/prd-NNN-<slug>-mockups/`.
+
+   The README contains the iteration discipline (one HTML at a time,
+   ask "polish/next/revise" after each). The agent will read both
+   files directly — no need to paste contents.
    ```
 
    Fill in every <placeholder> with the actual content from the PRD
@@ -140,14 +143,16 @@ If `pm` reports a blocker (missing context, contradictory brief, etc.), surface 
 
 ## Phase 2: Seed `docs/ux/README.md` (one-time per repo)
 
-If `docs/ux/README.md` does **not** exist, write it now. This file gives the user the one-time Claude Desktop Project setup instructions; subsequent `/new-project` invocations skip this phase.
+If `docs/ux/README.md` does **not** exist, write it now. This file is the **operating rules** for the designer agent — whichever agent (typically Claude Desktop with filesystem access) is producing mocks reads this directly. Subsequent `/new-project` invocations skip this phase.
 
 Write the following content verbatim:
 
 ````markdown
-# UX Mocks — handoff convention
+# UX Mocks — designer rules
 
-This directory holds visual mocks for each PRD's CUJs. Mocks are produced in **Claude Desktop**, not by any agent in this repo — agents are bad at iterative visual design; Claude Desktop's chat interface is fast for polishing.
+This directory holds visual mocks for each PRD's CUJs. Mocks are produced **outside the code-side dev loop** (typically in Claude Desktop, or any chat agent with filesystem access to this repo) and consumed by QA for visual-fidelity checking.
+
+If you are an agent asked to produce mocks for this repo, **read this file first** — it is your operating spec. Then read the relevant `MOCK_BRIEF.md` for the specific PRD.
 
 ## Folder layout
 
@@ -155,7 +160,7 @@ This directory holds visual mocks for each PRD's CUJs. Mocks are produced in **C
 docs/ux/
 ├── README.md                              ← you are here
 ├── prd-NNN-<slug>-mockups/
-│   ├── MOCK_BRIEF.md                      ← handoff doc, written by pm via /new-project
+│   ├── MOCK_BRIEF.md                      ← per-PRD spec, written by /new-project
 │   ├── cuj-1-initial.html
 │   ├── cuj-1-after-action.html
 │   ├── cuj-2-empty.html
@@ -163,35 +168,39 @@ docs/ux/
 └── ...
 ```
 
-QA discovers mocks by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}` — you do not need to register new mocks anywhere.
+QA discovers mocks by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}` — no registration anywhere is needed.
 
-## One-time setup: Claude Desktop "UX Mocks" Project
+## Designer rules (operating spec)
 
-1. Open Claude Desktop → Projects → "New Project".
-2. Name it **UX Mocks**.
-3. Paste the following into the Project's **Custom Instructions**:
+You are a UX designer producing HTML mocks for a developer workflow. Follow these rules strictly:
 
-   > You are a UX designer producing HTML mocks for a developer workflow.
-   >
-   > When the user pastes a MOCK_BRIEF.md:
-   > - Read every visual state listed.
-   > - For each state, produce a self-contained `.html` file. Tailwind via CDN is fine. No JS unless interactivity itself is the mock's point.
-   > - Files must be named `cuj-<id>-<state>.html` exactly.
-   > - Show me each one rendered before moving to the next.
-   > - After each, ask: "polish, next, or revise?"
-   >
-   > Visual style defaults: clean, modern, neutral palette, generous whitespace, 14–16px body text, system font stack. Override only when the MOCK_BRIEF specifies otherwise.
-   >
-   > Output one HTML per response inside a ```html fenced block so it is easy to copy back into the repo.
+### File output
 
-4. Done. You only set this up once. Reuse it for every project.
+- Files must be named **`cuj-<id>-<state>.html`** exactly — IDs and states come from the MOCK_BRIEF.
+- Self-contained HTML. Tailwind via CDN is fine. No JS unless interactivity itself is what's being mocked.
+- Mocks must be **full UI mocks**, not abstract background art. Every mock includes the actual screen chrome: header, primary actions, content area, state-specific elements named in the brief. If you find yourself drawing only gradients/blobs, stop — you're missing the foreground UI.
 
-## Workflow per PRD
+### Iteration discipline (this is the most important rule)
 
-1. In Claude Code: `/new-project` (this writes `MOCK_BRIEF.md` for you).
-2. Open the new `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`.
-3. Paste it into a new conversation in your Claude Desktop **UX Mocks** Project.
-4. Save each HTML response into this directory using the exact filename Claude Desktop names it.
+- **Produce ONE HTML per response.** Do not bulk-produce multiple files in a single response, even if the brief lists many states.
+- After each file:
+  1. Render it (or show the rendered preview) so the user can review.
+  2. Ask: **"polish, next, or revise?"**
+  3. Wait for the user's answer before producing anything else.
+- Do not advance to the next CUJ state until the user says "next".
+
+### Visual defaults
+
+Clean, modern, neutral palette. Generous whitespace. 14–16px body text. System font stack. Override only when the MOCK_BRIEF explicitly specifies otherwise (e.g., dark theme, brand color).
+
+### Verifying the brief before drawing
+
+- If the MOCK_BRIEF is missing a state, copy string, or visual constraint you need, ASK before drawing. Do not invent.
+- If the brief contradicts the PRD it points to, ASK which is authoritative.
+
+### File output format
+
+Output each HTML inside a ```html fenced block so it is easy to copy into the repo.
 ````
 
 ## Phase 3: Final handoff to the user
@@ -203,10 +212,13 @@ PRD written: docs/prd/prd-NNN-<slug>.md
 Mock brief: docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md
 Mockups dir: docs/ux/prd-NNN-<slug>-mockups/
 
-Next steps:
-1. (First time only) Set up your Claude Desktop "UX Mocks" Project — see docs/ux/README.md.
-2. Open the MOCK_BRIEF.md above and paste it into a new conversation in that Project.
-3. Save each generated HTML into the mockups dir.
+To produce mocks, open a chat agent with filesystem access to this
+repo and send:
+
+  Please produce mocks for this PRD. First read docs/ux/README.md
+  for your designer rules, then read docs/ux/prd-NNN-<slug>-mockups/
+  MOCK_BRIEF.md. Produce one HTML at a time per the rules and save
+  each into docs/ux/prd-NNN-<slug>-mockups/.
 ```
 
 Substitute the actual paths. Do not editorialize — the user has everything they need.

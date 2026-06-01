@@ -2,5 +2,5 @@
   "title": "triage",
   "summary": "Diagnose reported issues, assess scope, identify root cause, and recommend a resolution path (quick-fix vs. dev-cycle). Reads from docs/issues.md or takes a direct issue description.",
   "created_at": "2026-06-01T13:57:23Z",
-  "updated_at": "2026-06-01T14:00:22Z"
+  "updated_at": "2026-06-01T14:47:57Z"
 }

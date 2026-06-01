@@ -149,18 +149,19 @@ for the definition of 'done' — apply it strictly."
 
 ### After QA completes:
 
-Read `docs/qa-report.md` and check the verdict:
+Read `docs/qa-report.md` and check the overall verdict plus bug severities. The verdict alone doesn't decide the loop — combine it with the severity distribution:
 
-- **QA PASS**: Continue to Phase 5.
-- **QA FAIL with only LOW/MEDIUM bugs**: Continue to Phase 5 (bugs will be picked up next iteration).
-- **QA FAIL with HIGH bugs or FABRICATION**: **Do NOT continue to Phase 5.** Instead:
-  1. Log the failures in `docs/loop-state.md`
-  2. Jump back to **Phase 2** (re-plan with QA failures as priority tasks)
-  3. Re-execute **Phase 3** (fix the issues)
-  4. Re-execute **Phase 4** (re-verify)
+- **`PASS`** (no bugs): Continue to Phase 5.
+- **`FAIL` with only `LOW` bugs across the entire report**: Continue to Phase 5. The LOW bugs are queued as next-iteration tasks (qa Step 9 already appended them).
+- **`FAIL` with any bug of severity `MEDIUM` or higher** (any kind — `BUG`, `REGRESSION`, `FABRICATION`, `FLAKY`): **Do NOT continue to Phase 5.** Instead:
+  1. Log the failures in `docs/loop-state.md`.
+  2. Jump back to **Phase 2** (re-plan with QA-fix tasks as the priority).
+  3. Re-execute **Phase 3** (fix the issues).
+  4. Re-execute **Phase 4** (re-verify).
   5. Maximum 2 QA retry loops per iteration. If still failing after 2 retries, mark status as `blocked` with QA details and stop.
+- **`BLOCKED`** (any CUJ Result is BLOCKED): Stop the loop, mark status as `blocked` in `docs/loop-state.md`, and surface the missing capability to the user. Do not retry — retries cannot fix a missing tool.
 
-This inner loop ensures critical bugs and fabrications are fixed within the same iteration, not deferred indefinitely.
+This inner loop ensures non-trivial bugs (MEDIUM+) are fixed within the same iteration, while LOW cosmetic issues flow forward without spinning the loop.
 
 ---
 

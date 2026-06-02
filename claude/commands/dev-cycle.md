@@ -24,6 +24,36 @@ Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `
 
 ---
 
+## Mocks Check
+
+Mock production happens outside this loop (typically Claude Desktop with filesystem access to this repo) and is consumed by QA in Phase 4 for visual-fidelity comparison. Surface missing mocks now so the user can produce them before QA runs, rather than discovering `NO_MOCK` silently after the fact.
+
+1. Identify in-scope CUJs:
+   - **Scoped mode**: `[ ]` CUJs in the target PRD
+   - **Unscoped mode**: `[ ]` CUJs across all active PRDs
+
+2. For each in-scope CUJ, glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
+
+3. If every in-scope CUJ has at least one matching mock file, print one line ("Mocks present for all in-scope CUJs.") and continue to Phase 1.
+
+4. Otherwise, list the CUJs missing mocks and use `AskUserQuestion` to ask the user to choose:
+   - **Proceed without fidelity check** — QA will log `NO_MOCK` for these CUJs and skip visual comparison; functional verification still runs.
+   - **Pause** — stop the cycle here so mocks can be produced externally.
+
+   Include the Claude Desktop handoff prompt verbatim so the user can paste it immediately:
+
+   ```
+   Please produce mocks. First read docs/ux/README.md for your designer
+   rules, then read docs/ux/<prd-dir>/MOCK_BRIEF.md. Produce one HTML at
+   a time per the rules and save each into docs/ux/<prd-dir>/.
+   ```
+
+   Substitute `<prd-dir>` with the actual mockups directory for the affected PRDs (one prompt per PRD if multiple are affected).
+
+5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after producing mocks.
+
+---
+
 ## Phase 1: Architecture Review
 
 Spawn a `tl` subagent:
@@ -53,12 +83,15 @@ Spawn a `planner` subagent:
 Prompt: "Based on the current project state, update docs/tasks.md with
 the next round of tasks. Read docs/prd/index.md and active PRDs under
 docs/prd/, all files under docs/design/, docs/status.md, and docs/qa-report.md
-(if it exists — qa failures and fabrications MUST become fix tasks with
-highest priority). Prioritize in this order:
-1. Fix QA FABRICATION items (fake data, no-op stubs, unexecuted pipelines)
-2. Fix QA FAIL items (bugs and regressions)
-3. Implement the highest-value unfinished CUJs
-Never schedule new feature work if unresolved QA FAIL items exist.
+(if it exists — every MEDIUM-or-higher bug must become a fix task with
+priority above new feature work). Prioritize in this order:
+1. Fix MEDIUM-or-higher bugs from docs/qa-report.md (any kind — BUG,
+   REGRESSION, FABRICATION, FLAKY, VISUAL_DEVIATION). Severity drives
+   priority, not kind: a [LOW][FABRICATION] is lower than a [HIGH][BUG].
+2. Implement the highest-value unfinished CUJs.
+3. Address LOW bugs from docs/qa-report.md as capacity allows.
+Never schedule new feature work while any MEDIUM-or-higher bug remains
+unresolved.
 Return a summary of what tasks were scheduled and how many parallel groups
 there are."
 ```
@@ -198,31 +231,14 @@ Return a summary of what changed and what still needs to be done."
 
 ---
 
-## Phase 7: Final Evaluation
+## Phase 7: Compute Verdict and Update Loop State
 
-Spawn a `tl` subagent:
+If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED`, or Phase 4 retry budget exhausted), use that status and skip the computation. Otherwise compute the verdict deterministically from PM Phase 6's report and the QA report — no agent call needed:
 
-```
-Prompt: "Review docs/prd/index.md, active PRDs under docs/prd/,
-docs/status.md, docs/qa-report.md, and all files under docs/design/.
+- **`done`** if QA verdict is `PASS` AND PM Phase 6 reported zero remaining `[ ]` CUJs in scope.
+- **`continue`** otherwise (progress was made, more work remains).
 
-Your verdict MUST be consistent with the QA report:
-- If docs/qa-report.md verdict is FAIL, you CANNOT return DONE.
-- If any FABRICATION items were found by QA, you CANNOT return DONE.
-
-Assess: are all CUJs in active PRDs implemented and verified by
-QA with a PASS verdict? Are there any architectural issues that
-must be resolved? Return one of three verdicts:
-- DONE: all CUJs satisfied, QA PASS, no blockers
-- CONTINUE: progress was made, more work remains, safe to iterate
-- BLOCKED: cannot proceed without user input — describe exactly what is needed"
-```
-
----
-
-## Phase 8: Update Loop State
-
-Write `docs/loop-state.md`:
+Then write `docs/loop-state.md`:
 
 ```markdown
 # Dev Loop State

@@ -238,12 +238,12 @@ If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED
 - **`done`** if QA verdict is `PASS` AND PM Phase 6 reported zero remaining `[ ]` CUJs in scope.
 - **`continue`** otherwise (progress was made, more work remains).
 
-Then write `docs/loop-state.md`:
+Then write `docs/loop-state.md`. The `Last updated` stamp uses local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`) — day-precision is insufficient because the loop can rewrite this file multiple times per day during inner retries. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
 
 ```markdown
 # Dev Loop State
 
-Last updated: <date>
+Last updated: <timestamp>
 Iteration: <N>
 Status: <continue | done | blocked>
 

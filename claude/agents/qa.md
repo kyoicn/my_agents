@@ -100,6 +100,8 @@ After writing new tests, run the full suite:
 
 **This step is mandatory.** Automated tests passing is not sufficient.
 
+**Artifact path: `<run-id>` is `iter<N>-<HH-MM-SS>`** where N is the iteration counter from `docs/loop-state.md` (default `1` if loop-state doesn't exist) and `HH-MM-SS` is the local time when this QA invocation started (`date "+%H-%M-%S"`). Each QA invocation gets its own bucket so retries within the same iteration don't overwrite earlier walks. Example: `docs/qa-artifacts/iter3-14-23-45/cuj-3/run1/00-initial.png`. Capture `<run-id>` once at the start of Step 7 and reuse it for every screenshot path in this invocation.
+
 <!-- SYNC:web-app-verification -->
 #### For web apps/services:
 
@@ -111,11 +113,11 @@ For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk
 
 1. **Start (or restart) the dev server** with `Bash` (e.g., `npm run dev &`, `yarn dev &`). Capture the URL. (You may reuse the same dev server across the two runs; you must NOT reuse the same browser session.)
 2. **Navigate**: `mcp__playwright__browser_navigate` to the entry URL specified in the CUJ Preconditions. If the browser binary is missing, run `mcp__playwright__browser_install` once and retry.
-3. **Capture initial state**: `mcp__playwright__browser_snapshot` (accessibility tree) and `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/00-initial.png` (where `<run>` is `run1` or `run2`).
+3. **Capture initial state**: `mcp__playwright__browser_snapshot` (accessibility tree) and `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/00-initial.png` (where `<run>` is `run1` or `run2`).
 4. **Walk each Journey Step** from the CUJ spec, in order:
    - Execute the user action with the matching tool: `browser_click` for clicks, `browser_type` for text entry, `browser_select_option` for dropdowns, `browser_press_key` for keyboard input, `browser_hover` for hover effects, `browser_drag` for drag-and-drop, `browser_handle_dialog` for confirms/alerts, `browser_file_upload` for uploads, `browser_fill_form` for whole-form fills.
    - Wait for the response: `mcp__playwright__browser_wait_for` with a selector or timeout that matches the spec's expected response.
-   - Screenshot: `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/<NN>-<step-slug>.png`.
+   - Screenshot: `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/<NN>-<step-slug>.png`.
    - Verify the "System response" and "User sees" descriptions from the CUJ against the page (use `browser_snapshot` to inspect content programmatically, not your assumptions).
 5. **Walk each Edge Case & Error State** the same way, with separate screenshots under `.../<run>/edge-<N>-<slug>.png`.
 6. **Capture console output**: `mcp__playwright__browser_console_messages`. Any `error`-level message during the walkthrough is a finding — include the full message in the report.
@@ -129,7 +131,7 @@ Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow 
 1. For each CUJ, glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
 2. If zero matches → log `Mocks: NO_MOCK` for this CUJ in the report. Skip fidelity comparison; continue with functional verification only. (Result is unaffected; this is a label, not a failure.)
 3. If matches exist, for each Journey Step that has a corresponding mock (file name matches the step state — e.g., `cuj-3-initial.html` matches step 1's "initial" state), perform a comparison dispatched by extension:
-   - **`.html`** — open the mock in a second browser tab with `mcp__playwright__browser_tab_new` then `browser_navigate` to `file://<absolute mock path>`. Take a screenshot of the mock tab; the implementation screenshot already exists from the Journey Step walk. Save both as `docs/qa-artifacts/<iteration>/<cuj-id>/<run>/<NN>-step-live.png` and `<NN>-step-mock.png`. Use your vision capability to compare the two images side-by-side — check layout, spacing, colors, copy, element presence, hierarchy. Close the mock tab with `mcp__playwright__browser_tab_close`.
+   - **`.html`** — open the mock in a second browser tab with `mcp__playwright__browser_tab_new` then `browser_navigate` to `file://<absolute mock path>`. Take a screenshot of the mock tab; the implementation screenshot already exists from the Journey Step walk. Save both as `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/<NN>-step-live.png` and `<NN>-step-mock.png`. Use your vision capability to compare the two images side-by-side — check layout, spacing, colors, copy, element presence, hierarchy. Close the mock tab with `mcp__playwright__browser_tab_close`.
    - **`.png` / `.jpg` / `.webp`** — Read the mock image directly. Compare against the Journey Step screenshot (also a PNG). Same vision-based check.
    - **`.md`** — Read the markdown file. Treat each statement as an additional textual acceptance criterion. Verify each against `browser_snapshot` output and observed behavior.
 4. **Placeholder regions** — if a mock element's visible text matches the pattern `[<word> placeholder]` (e.g., `[Map placeholder — dark-theme world map]`), treat that region as a placeholder. Verify the implementation renders **something** in approximately the same position and bounds, but do NOT compare its visual content. Record as `Placeholder regions verified by layout: <list>` in the per-CUJ Artifacts section. Do not log placeholder-region differences as `VISUAL_DEVIATION`. Non-placeholder UI (chrome, copy, other panels) is still fidelity-checked normally.
@@ -186,10 +188,12 @@ Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow 
 
 Write `docs/qa-report.md` structured around CUJ verification. Use the project's working language.
 
+**Timestamps** in this report (the top-level `Last updated` stamp and the `source: qa-report.md <timestamp>` annotation appended to QA-fix tasks in Step 9) use local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Day-precision is insufficient because retries can produce multiple reports per day. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
+
 ```markdown
 # QA Report
 
-Last updated: <date>
+Last updated: <timestamp>
 Scope: <all active PRDs | specific PRD file>
 
 ## Verdict: PASS | FAIL | BLOCKED
@@ -228,7 +232,7 @@ Scope: <all active PRDs | specific PRD file>
 - <What was tested manually, what was observed, any deviations from spec, any differences between run1 and run2>
 
 #### Artifacts
-- Screenshots: `docs/qa-artifacts/<iteration>/<cuj-id>/run1/` and `.../run2/` (list per-step files)
+- Screenshots: `docs/qa-artifacts/<run-id>/<cuj-id>/run1/` and `.../run2/` (list per-step files)
 - Console messages (run1): <none | summary of error-level entries>
 - Console messages (run2): <none | summary of error-level entries>
 - Network requests verified: <list, if the CUJ specifies network behavior>
@@ -285,7 +289,7 @@ After writing the QA report, update `docs/tasks.md` to reflect reality:
 2. **For each bug found**, check if a corresponding task already exists in `docs/tasks.md`:
    - If not, append a new task to the appropriate section, tagged with severity and kind:
    ```markdown
-   - [ ] **QA-fix [<SEVERITY>][<KIND>]**: <description> — source: qa-report.md <date>
+   - [ ] **QA-fix [<SEVERITY>][<KIND>]**: <description> — source: qa-report.md <timestamp>
    ```
 
 3. **Update `docs/loop-state.md`** (if it exists) to reflect overall QA verdict:

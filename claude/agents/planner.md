@@ -105,12 +105,18 @@ After user approval, write to `docs/tasks.md`. Use the project's working languag
 
 `docs/tasks.md` is the **input file for the executor** — it must only contain tasks that need to be done right now. **Always overwrite the entire file** with a fresh plan derived from current requirements, status, and codebase. Never carry over previous contents.
 
+**Timestamps** use local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Day-precision is insufficient for the autonomous loop. Get the current timestamp via:
+
+```bash
+python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"
+```
+
 Use this format:
 
 ```markdown
 # Task Plan
 
-Last updated: <date>
+Last updated: <timestamp>
 
 ## Current State
 <Brief summary of where the project stands and what the current focus is>

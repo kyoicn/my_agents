@@ -32,13 +32,19 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
    - What's working and what's not yet built
    - Recent development focus and momentum
 
-4. **Write `docs/status.md`** with the following structure (translate all section headers and content into the determined working language):
+4. **Write `docs/status.md`** with the following structure (translate all section headers and content into the determined working language).
+
+   **Timestamps** use local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Day-precision is insufficient for the autonomous loop, which writes this file multiple times per day during retries. Get the current timestamp via:
+
+   ```bash
+   python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"
+   ```
 
 ```markdown
 # Project Status
 
 > Auto-generated project status summary.
-> Last updated: YYYY-MM-DD
+> Last updated: <timestamp>
 
 ## Overview
 Brief 2-3 sentence description of what this project is and its current phase.

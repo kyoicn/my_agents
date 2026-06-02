@@ -193,10 +193,12 @@ Every design doc must be **implementation-ready** — detailed enough that an en
 
 **Mandatory elements in each `design-<slug>.md`:**
 
+The `Last updated` stamp uses local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
+
 ```markdown
 # <Component/Domain Name>
 
-> Last updated: YYYY-MM-DD
+> Last updated: <timestamp>
 > Serves: prd-001, prd-013, prd-020 (list relevant PRDs)
 
 ## Overview

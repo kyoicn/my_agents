@@ -40,7 +40,8 @@ Before decomposing anything, build a thorough understanding from the sources of 
 - `docs/status.md` — current status snapshot (if it exists; verify against actual code since it may be stale)
 - `docs/design/system.md` — cross-cutting system design and constraints
 - `docs/design/design-*.md` — component/domain-level design docs
-- `docs/qa-report.md` — test results and failures (if it exists — failures should become tasks)
+- `docs/qa-report.md` — engineering-side per-CUJ verdicts (PASS/FAIL/BLOCKED/etc.) and bug list (if it exists — failures become tasks). **This is the canonical source for "what's done on the engineering side."**
+- `docs/pm-review.md` — product-side per-CUJ verdicts (Satisfied/Caveats/Not done) plus recommended next-iteration priorities (if it exists — Caveats and Not-done become tasks; the priority list is your top input for what to plan).
 - The actual codebase — **always verify what's truly implemented by reading the code**, don't rely solely on docs
 - Project structure — `ls` key directories, read entry points
 - `package.json` / `Podfile` / `build.gradle` / equivalent — tech stack and dependencies
@@ -50,13 +51,19 @@ Before decomposing anything, build a thorough understanding from the sources of 
 
 ### 3. Identify what to work on
 
-If the user provided a specific goal, use that. Otherwise:
-- Compare CUJs (`[ ]` items in active PRDs under `docs/prd/`) against what's actually implemented
-- Respect CUJ dependency ordering — if CUJ-B depends on CUJ-A, CUJ-A must be in an earlier parallel group
-- Identify the highest-impact unfinished CUJs
-- Consider natural sequencing — what unblocks the most downstream work?
-- Factor in recent momentum — if the user has been working on area X, adjacent work in X may be higher priority
-- Present your recommended focus to the user and get confirmation before proceeding
+If the user provided a specific goal, use that. Otherwise, derive **remaining CUJs** mechanically (PRDs are pure spec — they do NOT carry per-CUJ progress markers; do not look for `[ ]` checkboxes in them):
+
+- Start with the full list of CUJs in active PRDs under `docs/prd/`.
+- Subtract any CUJ whose **latest verdict in both** `docs/qa-report.md` (Final Result = `PASS`) **and** `docs/pm-review.md` (PM verdict = `Satisfied`) marks it done.
+- The remainder are unfinished. CUJs with QA `PASS` but PM `Caveats`/`Not done` are unfinished too — PM's product-side verdict is a gate.
+- If `docs/qa-report.md` or `docs/pm-review.md` does not exist (e.g., iteration 1), treat all CUJs as unfinished.
+
+Then prioritize:
+- Respect CUJ dependency ordering — if CUJ-B depends on CUJ-A, CUJ-A must be in an earlier parallel group.
+- If `docs/pm-review.md` exists, **its "Recommended Next-Iteration Priorities" list is your starting order** — PM has already done strategic sequencing for you. Adjust only for hard dependencies or fresh signal you see in the code.
+- Identify the highest-impact unfinished CUJs.
+- Factor in recent momentum — if the user has been working on area X, adjacent work in X may be higher priority.
+- Present your recommended focus to the user and get confirmation before proceeding.
 
 ### 4. Analyze the goal
 

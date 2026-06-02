@@ -16,21 +16,21 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
    - If you cannot ask (non-interactive) and docs are ambiguous, fall back to English.
 
 2. **Gather information** by reading the project thoroughly:
-   - Read all documentation files in `docs/` (PRDs under `docs/prd/`, architecture, playbook, etc.)
-   - Read `package.json` for dependencies and scripts
-   - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.)
-   - Read key source files to understand what's implemented
-   - Check `CLAUDE.md` if it exists for project instructions
-   - Run `git log --oneline -20` to see recent development activity
-   - Run `git diff --stat HEAD~5` (or similar) to see what areas changed recently
+   - **`docs/prd/index.md` and all `docs/prd/prd-NNN-*.md`** — the spec, source of the CUJ list. PRDs no longer carry per-CUJ progress markers; you derive each CUJ's progress below.
+   - **`docs/qa-report.md`** (if it exists) — engineering-side per-CUJ Final Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED). Canonical source for the "QA" column.
+   - **`docs/pm-review.md`** (if it exists) — product-side per-CUJ verdict (Satisfied/Caveats/Not done). Canonical source for the "PM" column.
+   - Read `package.json` for dependencies and scripts.
+   - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.).
+   - Read key source files to understand what's implemented — this gives you the "Impl" column. Match impl back to specific CUJs via file/feature naming.
+   - Check `CLAUDE.md` if it exists for project instructions.
+   - Run `git log --oneline -20` to see recent development activity.
+   - Run `git diff --stat HEAD~5` (or similar) to see what areas changed recently.
 
-3. **Analyze** what you've gathered and determine:
-   - Which features are implemented vs. planned vs. in-progress
-   - The current tech stack and key dependencies
-   - Project architecture and how components connect
-   - Data flow and key types/interfaces
-   - What's working and what's not yet built
-   - Recent development focus and momentum
+3. **Analyze** what you've gathered and determine, **per CUJ**:
+   - **Impl**: `not started` (no code) | `in progress` (partial code, recent commits) | `merged` (code present and built). Derive from the codebase + git history, not from any tracker.
+   - **QA**: latest Final Result from `docs/qa-report.md` (or `—` if no QA run yet).
+   - **PM**: latest verdict from `docs/pm-review.md` (or `—` if no PM review yet).
+   - At the project level, also determine: tech stack, architecture, data flow, recent focus.
 
 4. **Write `docs/status.md`** with the following structure (translate all section headers and content into the determined working language).
 
@@ -55,16 +55,22 @@ Table or list of key technologies, frameworks, and tools in use.
 ## Architecture
 High-level description of how the project is structured — key directories, data flow, and component relationships.
 
-## Feature Status
+## CUJ Status
 
-### Implemented
-Bullet list of features that are complete and working.
+The authoritative per-CUJ snapshot. Each row records the latest known state across three independent dimensions: **Impl** (does the code exist?), **QA** (engineering verification), **PM** (product judgment). Derive from `docs/qa-report.md`, `docs/pm-review.md`, and the codebase — not from PRDs (PRDs are spec only).
 
-### In Progress
-Bullet list of features currently being worked on (infer from recent commits/changes).
+| CUJ | PRD | Priority | Impl | QA | PM |
+|-----|-----|----------|------|----|----|
+| CUJ-1: <title> | prd-000 | P0 | merged | PASS | Satisfied |
+| CUJ-2: <title> | prd-000 | P0 | in progress | — | — |
+| CUJ-3: <title> | prd-001 | P1 | not started | — | — |
 
-### Planned / Not Yet Started
-Bullet list of features defined in requirements but not yet implemented.
+**Column values:**
+- `Impl`: `not started` | `in progress` | `merged`
+- `QA`: `PASS` | `FAIL` | `BLOCKED` | `NOT_RUN` | `WAIVED` | `—` (no QA run yet)
+- `PM`: `Satisfied` | `Caveats` | `Not done` | `—` (no PM review yet)
+
+A CUJ is **fully done** when Impl=`merged`, QA=`PASS`, AND PM=`Satisfied`. Any other combination means there's still work — list the next action under "Known Issues & TODOs" or in pm-review's recommended priorities.
 
 ## Key Types & Interfaces
 Document the core data types that flow through the system (keep it concise — type name, key fields, purpose).

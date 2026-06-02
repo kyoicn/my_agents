@@ -216,27 +216,37 @@ QA finding noted."
 
 ## Phase 6: PM Review
 
+This is the product-side gate. The engineering team has produced an implementation; PM now answers "are all requirements satisfied?" — product judgment that QA doesn't make. PM does **not** mutate PRDs (PRDs are pure spec); they write `docs/pm-review.md` with a per-CUJ Satisfied / Caveats / Not done verdict.
+
 Spawn a `pm` subagent:
 
 ```
-Prompt: "Review docs/status.md and docs/qa-report.md against the active
-PRDs under docs/prd/. Walk each CUJ step by step against the actual
-implementation. Identify: what CUJs are fully satisfied, what needs
-adjustment based on what was actually built, and what gaps remain.
-IMPORTANT: If QA verdict was FAIL, do NOT mark any failed CUJ as
-complete in the PRD files. Only mark CUJs as [x] if QA explicitly
-passed them. Update the relevant PRD files and docs/prd/index.md.
-Return a summary of what changed and what still needs to be done."
+Prompt: "Execute Section 6 (Review implemented work) of your role
+definition. Walk every in-scope CUJ against the running implementation;
+read docs/qa-report.md for the engineering-side verdict; produce a
+product-side judgment per CUJ; write docs/pm-review.md following the
+structure in your role definition.
+
+You may also flip PRD frontmatter status: active → completed for any
+PRD whose CUJs are all Satisfied in your review. That is the only PRD
+file edit allowed in this phase — do not toggle any per-CUJ markers
+(those don't exist anymore).
+
+Return: a one-paragraph summary plus the count of CUJs per verdict
+(Satisfied / Caveats / Not done) and the list of recommended priorities
+for the next iteration."
 ```
 
 ---
 
 ## Phase 7: Compute Verdict and Update Loop State
 
-If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED`, or Phase 4 retry budget exhausted), use that status and skip the computation. Otherwise compute the verdict deterministically from PM Phase 6's report and the QA report — no agent call needed:
+If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED`, or Phase 4 retry budget exhausted), use that status and skip the computation. Otherwise compute the verdict deterministically from **both** the QA report and PM's review — no agent call needed:
 
-- **`done`** if QA verdict is `PASS` AND PM Phase 6 reported zero remaining `[ ]` CUJs in scope.
-- **`continue`** otherwise (progress was made, more work remains).
+- **`done`** if QA verdict is `PASS` (or `FAIL` with LOW-only bugs) AND **every in-scope CUJ has PM verdict `Satisfied`** in `docs/pm-review.md`. Both gates must pass.
+- **`continue`** otherwise — either QA found MEDIUM+ bugs (and the Phase 4 inner loop didn't already exit), or PM judged at least one CUJ `Caveats` or `Not done`. The PM review's "Recommended Next-Iteration Priorities" list seeds the next planner.
+
+This two-key gate ensures engineering correctness (QA) and product intent (PM) both sign off before the loop terminates. QA can pass a CUJ that meets every literal acceptance criterion while PM correctly judges it `Caveats` because the impl misses the point of the feature — that's a `continue` signal, not a `done`.
 
 Then write `docs/loop-state.md`. The `Last updated` stamp uses local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`) — day-precision is insufficient because the loop can rewrite this file multiple times per day during inner retries. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
 

@@ -211,6 +211,26 @@ Clean, modern, neutral palette. Generous whitespace. 14–16px body text. System
 - If the brief contradicts the PRD it points to, ASK which is authoritative.
 ````
 
+## Phase 2.5: Seed `docs/status.md` with the new CUJs
+
+`docs/status.md` is the canonical per-CUJ progress doc. It must exist from day 0 so the user (and the loop's agents) always have one place to answer "where are we?". Run this phase **after** Phase 1 wrote the PRD.
+
+Spawn a `status` subagent:
+
+```
+Prompt: "Refresh docs/status.md. A new PRD was just written
+(docs/prd/prd-NNN-<slug>.md, substitute the actual path); every CUJ
+in it starts with Impl=`not started`, QA=`—`, PM=`—` since no code
+or verification exists yet. If docs/status.md already exists (because
+this is a second PRD added to an existing project), preserve all
+existing rows and append rows for the new CUJs only. Follow your
+Section 4 template exactly. Do not commit."
+```
+
+The status agent handles the working-language detection and the table structure. After it returns, verify `docs/status.md` lists every CUJ from the new PRD.
+
+---
+
 ## Phase 3: Final handoff to the user
 
 After Phase 1 and Phase 2 complete, print a single concise summary to the user:
@@ -219,6 +239,7 @@ After Phase 1 and Phase 2 complete, print a single concise summary to the user:
 PRD written: docs/prd/prd-NNN-<slug>.md
 Mock brief: docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md
 Mockups dir: docs/ux/prd-NNN-<slug>-mockups/
+Status seeded: docs/status.md (CUJs from this PRD added as `not started`)
 
 To produce mocks, open a chat agent with filesystem access to this
 repo and send:

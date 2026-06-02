@@ -195,7 +195,8 @@ Pre-approve common tools so agents don't prompt for every command, and set the d
       "Glob",
       "Grep",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "mcp__playwright__*"
     ]
   },
   "effortLevel": "high",

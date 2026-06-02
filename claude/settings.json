@@ -15,7 +15,8 @@
       "Glob",
       "Grep",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "mcp__playwright__*"
     ]
   },
   "effortLevel": "high",

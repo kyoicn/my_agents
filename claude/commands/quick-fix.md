@@ -9,20 +9,22 @@ You are fixing a small-scope issue — a clear bug, spec deviation, or defect th
 ## Input
 
 Check how you were invoked:
-- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that issue.
-- **With a pre-triaged issue** (e.g., `quick-fix ISS-001` or context from a prior `/triage` run): Skip to fix using the existing diagnosis.
-- **Without arguments**: Read `docs/issues.md`, pick the first triaged small/medium-scope entry, and fix it.
+- **With an issue ID** (e.g., `quick-fix 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md` and fix it. If the block has a `Triage` field, use it as the diagnosis (verify against current code quickly). If not, run the triage logic from `/triage` inline first.
+- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that ad-hoc description in one shot, without going through `docs/issues.md`.
+- **Without arguments**: Read `docs/issues.md`, pick the first **triaged** small/medium-scope block (one whose `Triage` field shows scope=small or scope=medium), and fix it.
 
 ## Process
 
 ### 1. Triage (if not already done)
 
+If the issue block already has a `Triage` field (because `/triage` ran on it), use that as the diagnosis but verify it's still accurate by quickly reading the relevant code.
+
 If the issue hasn't been triaged yet:
 - Read the relevant source code and CUJs
+- **If the block has a `Screenshots` field, read each screenshot with the Read tool** for visual context before diagnosing.
 - Identify root cause, files involved, and scope
 - If scope is **large**: STOP. Tell the user: "This issue has design implications — recommend using `/dev-cycle` instead." Explain why. Do not attempt the fix.
-
-If the issue was already triaged (from a prior `/triage` run or from a triaged entry in `docs/issues.md`), use that diagnosis but quickly verify it's still accurate by reading the relevant code.
+- If scope is **spec-gap** or **spec-conflict**: STOP. Recommend `/design-feature` (Route C or D) and explain.
 
 ### 2. Plan the fix
 
@@ -65,9 +67,18 @@ Refs CUJ-<ID> (<prd-file>)
 <one-line explanation of root cause and what was changed>
 ```
 
-### 7. Update docs/issues.md
+### 7. Clean up the issue + its attachments
 
-If the issue came from `docs/issues.md`, remove the entry. The fix is recorded in git history — the inbox doesn't need to track resolved items.
+If the issue came from `docs/issues.md`:
+
+1. Locate the issue's h3 block in `docs/issues.md`. Note any files listed under its `Screenshots:` field.
+2. **Delete those screenshot files** from `docs/issues-attachments/`. They were transient evidence; the fix is in git, the screenshots are no longer needed.
+3. **Remove the entire h3 block** from `docs/issues.md`, including the leading `---` separator. Be careful not to remove an adjacent issue's separator.
+4. If `docs/issues.md` is now empty (just the preamble), leave the preamble in place — don't delete the file.
+
+The fix is recorded in git history — the inbox doesn't need to track resolved items, and the attachments dir stays clean.
+
+If the issue came from a direct `quick-fix "<description>"` invocation (no block in `docs/issues.md`), there's nothing to clean up — the git commit is the only record.
 
 ## Scope guard
 
@@ -86,3 +97,5 @@ Do not push through a large fix just because you started. It's better to stop ea
 - Don't skip running tests
 - Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
 - Don't leave stale entries in docs/issues.md after fixing
+- Don't leave orphaned screenshots in docs/issues-attachments/ — Step 7 deletes them along with the issue block
+- Don't commit screenshots from docs/issues-attachments/ — the directory should already be in .gitignore (created by /report-bug); never bypass that

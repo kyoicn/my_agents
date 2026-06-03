@@ -9,8 +9,9 @@ You are diagnosing reported issues to determine their root cause, scope, and the
 ## Input
 
 Check how you were invoked:
-- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that single issue.
-- **Without arguments**: Read `docs/issues.md` and diagnose all open entries.
+- **With an issue ID** (e.g., `triage 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md`, including its `Screenshots:` field if present, and diagnose only that issue.
+- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that ad-hoc description. Do NOT write anything back to `docs/issues.md` — there's no block to attach to. Just print the diagnosis.
+- **Without arguments**: Read `docs/issues.md` and diagnose every block that doesn't already have a `**Triage**:` field.
 
 If `docs/issues.md` doesn't exist and no description was provided, tell the user there's nothing to triage.
 
@@ -31,6 +32,7 @@ Quickly orient yourself:
 - Understand what the code currently does vs. what it should do
 - Identify the specific file(s) and line(s) where the behavior originates
 - If it's a runtime issue and a dev server can be started, start it and verify
+- **If the issue block lists screenshots under `Screenshots:`, read each one with the Read tool** to incorporate the visual evidence into your diagnosis. A screenshot often pinpoints the layout/state where the bug manifests faster than re-reading the code.
 
 **b) Map to requirements**
 - Find which CUJ(s) this issue relates to
@@ -49,8 +51,8 @@ Classify as one of five scopes:
 | **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
 | **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
 | **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
-| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/user:pm` (define the feature first) |
-| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → update PRD, report wrong → close as invalid) |
+| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` (Route C extend or Route D refine — let the orchestrator decide) |
+| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → `/design-feature` Route D to refine; report wrong → close as invalid) |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -72,7 +74,7 @@ For each issue, print a structured diagnosis:
 **Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /user:pm | ask user
+**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /design-feature | ask user
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
@@ -84,7 +86,7 @@ For large-scope issues, additionally explain:
 For spec-gap issues, additionally explain:
 - What behavior the user expects that no CUJ currently defines
 - What questions PM needs to answer before implementation can start
-- Whether this is a net-new feature or an extension of an existing CUJ
+- Whether this is a net-new feature, an extension of an existing CUJ, or a refinement of an existing CUJ — this maps to which `/design-feature` route the user should invoke (B/C/D respectively)
 
 For spec-conflict issues, additionally explain:
 - What the PRD specifies (quote the relevant CUJ step or acceptance criterion)
@@ -92,27 +94,51 @@ For spec-conflict issues, additionally explain:
 - The current implementation (does it follow the PRD or not?)
 - Do NOT decide which side is correct — present both and ask the user to resolve
 
-### 4. Update docs/issues.md
+### 4. Update docs/issues.md — append a Triage field to the issue block
 
-After diagnosing, update each entry in `docs/issues.md` with the triage result. Change from raw description to triaged format:
+Each issue in `docs/issues.md` is an h3 block (written by `/report-bug`). After diagnosing, **append a structured `Triage:` field to the bottom of the block**. Do NOT modify the block's existing fields (Description, CUJ, Expected, Observed, Repro, Screenshots) — those are the original report; preserve them.
 
 Before:
-```
-- Sort order wrong on articles list
+```markdown
+### Issue 2026-06-03-14-30-25: Sort order wrong on articles list
+
+- **Filed**: 2026-06-03 14:30:25 (UTC+8)
+- **Description**: Articles in /articles render in random order
+- **CUJ**: CUJ-3 (prd-002-articles)
+- **Expected**: Sorted by date descending
+- **Observed**: Appears random
+- **Repro**: 1. Open /articles. 2. Note order ≠ date desc.
+- **Screenshots**:
+  - docs/issues-attachments/2026-06-03-14-30-25-1.png
 ```
 
 After:
+```markdown
+### Issue 2026-06-03-14-30-25: Sort order wrong on articles list
+
+- **Filed**: 2026-06-03 14:30:25 (UTC+8)
+- **Description**: Articles in /articles render in random order
+- **CUJ**: CUJ-3 (prd-002-articles)
+- **Expected**: Sorted by date descending
+- **Observed**: Appears random
+- **Repro**: 1. Open /articles. 2. Note order ≠ date desc.
+- **Screenshots**:
+  - docs/issues-attachments/2026-06-03-14-30-25-1.png
+- **Triage** (2026-06-03 15:02:11 (UTC+8)):
+  - **Scope**: small
+  - **Root cause**: `src/services/articles.ts:42` — `sort()` callback returns 0 for all comparisons because timestamps are strings
+  - **Files involved**: `src/services/articles.ts`
+  - **Recommended action**: `/quick-fix`
+  - **Risk**: low — isolated to one comparator, no API change
 ```
-- Sort order wrong on articles list — **small** → `/quick-fix` — CUJ-003 (prd-000) — `src/services/articles.ts:42`
-```
 
-The format is: `<description> — **<scope>** → `/<action>` — <CUJ> (<PRD>) — <root cause location>`
+Format rules:
+- Triage timestamp uses the same format as the rest of the project: `YYYY-MM-DD HH:MM:SS (UTC±N)`. Get it via the standard `python3 -c "..."` one-liner used elsewhere.
+- Append `Triage` at the bottom of the block, after the existing fields. Do not rewrite the headline; preserve it verbatim.
+- If a `Triage` field already exists on a block (re-triage), replace the entire `Triage` block with the new one. Don't accumulate.
+- If the issue turns out to be invalid (not a bug, works as designed, can't reproduce), remove the entire h3 block from `docs/issues.md` (including the leading `---` separator and any screenshots referenced in its Screenshots field — delete those files from `docs/issues-attachments/` too). Explain why in the diagnosis output.
 
-Where `<action>` is one of: `/quick-fix`, `/quick-fix` + QA, `/dev-cycle`, `/user:pm`, `ask user`.
-
-Keep it one line per issue. The detail is in the diagnosis output, not in the file.
-
-If an issue from `docs/issues.md` turns out to be invalid (not a bug, works as designed, can't reproduce), remove it from the file and explain why in the output.
+The format on disk is structured for human + agent readability. The diagnosis printed to the conversation (Step 3) is for the user reading now; the field-block in the file is for `/quick-fix` (and the user) to consume later.
 
 ## What NOT to do
 

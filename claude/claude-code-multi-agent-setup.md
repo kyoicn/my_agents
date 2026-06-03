@@ -44,12 +44,13 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 **Bug fixes (lightweight pipeline):**
 
 ```
-Issue ──► /triage (diagnose + scope) ──► /quick-fix  (small/medium) ──► commit
-  │                                 ├──► /dev-cycle  (large)
-  │                                 ├──► /user:pm    (spec-gap — needs feature design first)
-  │                                 └──► ask user    (spec-conflict — report contradicts PRD)
-  │
-  └── docs/issues.md (intake inbox)
+/report-bug ──► docs/issues.md (h3 block) + docs/issues-attachments/*.png (gitignored)
+       │
+       ▼
+   /triage  ──► appends Triage field to the issue block ──► /quick-fix  (small/medium) ──► commit
+                                                      ├──► /dev-cycle  (large)
+                                                      ├──► /design-feature  (spec-gap — feature needs design)
+                                                      └──► ask user        (spec-conflict — report vs PRD)
 ```
 
 ### The agents
@@ -68,8 +69,9 @@ Issue ──► /triage (diagnose + scope) ──► /quick-fix  (small/medium) 
 |---------|---------|
 | `/design-feature` | Design a product feature conversationally. Routes to one of four outcomes based on context and pitch: **A** bootstrap brand-new project (full discovery + first PRD + designer-rules seed), **B** new PRD in existing project, **C** extend an existing PRD with new CUJs, **D** refine existing CUJs in place. Always produces / updates the per-PRD `MOCK_BRIEF.md` for the external designer (typically Claude Desktop with filesystem access) and updates `docs/status.md` |
 | `/dev-cycle` | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict |
-| `/triage` | Diagnose reported issues (from `docs/issues.md` or freeform). Outputs a scope and a recommended next command (`/quick-fix`, `/dev-cycle`, `/user:pm`, or ask user) |
-| `/quick-fix` | Triage + fix small-scope issues directly. Escalates if the scope expands mid-fix |
+| `/report-bug` | Conversational bug intake. Captures description, expected/observed, CUJ link, and screenshots (tries drag-attached → clipboard via `pngpaste` → interactive `screencapture` → manual path). Writes an h3 block to `docs/issues.md` and saves screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
+| `/triage` | Diagnose issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or a freeform description). Appends a structured `Triage` field — scope, root cause, files, recommended action, risk — to the block. Recommended action is one of `/quick-fix`, `/dev-cycle`, `/design-feature`, or ask user |
+| `/quick-fix` | Fast-path fix for small/medium-scope issues. Operates on a `docs/issues.md` block by ID (uses its existing Triage field if present) or on an ad-hoc description. Removes the resolved block and its screenshots from `docs/issues-attachments/` after committing. Escalates if scope expands mid-fix |
 
 ### The workflows
 
@@ -103,11 +105,15 @@ Then open Claude Desktop (or any chat agent with filesystem access to the repo) 
 
 **Bug fixes:**
 ```
-/triage "describe the issue"        → diagnoses root cause, assesses scope, recommends action
-/quick-fix "describe the issue"     → triages + fixes small-scope issues directly
+/report-bug "<description>"         # conversational intake — handles screenshots,
+                                    # writes h3 block to docs/issues.md, optionally
+                                    # chains into /triage
+/triage <issue-id|description>      # diagnose: scope, root cause, recommended action
+/quick-fix <issue-id|description>   # fast-path fix for small/medium-scope, then
+                                    # removes the block + its screenshots
 ```
 
-Issues can also be written to `docs/issues.md` as a persistent intake inbox. `/triage` reads from it when invoked without arguments.
+The three-stage pipeline (`report → triage → fix-or-escalate`) is well-factored: each step is independently invocable, and `/report-bug` chains into `/triage` on user opt-in for the common all-in-one flow.
 
 ### Key design decisions
 
@@ -117,7 +123,7 @@ Issues can also be written to `docs/issues.md` as a persistent intake inbox. `/t
 4. **Working language detection**: All agents detect the project's working language from existing `docs/` files and write in that language. Technical terms are preserved as-is.
 5. **PRDs organized by feature, design docs organized by engineering domain**: PM writes CUJ-driven PRDs per product feature. TL writes design docs per engineering component/subsystem. Multiple PRDs may feed into one design doc; one PRD may require updates to multiple design docs. This decoupling prevents artificial 1:1 constraints.
 6. **Design docs as one coherent body**: All files in `docs/design/` form a single comprehensive engineering design document — individual files are chapters. `system.md` covers cross-cutting concerns; `design-<slug>.md` files cover component-specific design. The TL always reads ALL design docs before making changes to maintain consistency.
-7. **Separate pipelines for features vs. bugs**: Feature work flows through the full PM → TL → Planner → Execute → QA pipeline. Bug fixes use a lightweight triage → quick-fix path that bypasses PRDs and design docs (the spec isn't wrong, the code is). Large bugs that reveal design flaws are escalated to the full pipeline.
+7. **Separate pipelines for features vs. bugs**: Feature work flows through the full PM → TL → Planner → Execute → QA pipeline via `/design-feature` + `/dev-cycle`. Bug fixes use a lightweight `/report-bug` → `/triage` → `/quick-fix` path that bypasses PRDs and design docs (the spec isn't wrong, the code is). Large bugs that reveal design flaws are escalated to `/dev-cycle`; bugs that reveal *spec* flaws are escalated to `/design-feature` (Route C or D).
 8. **Issues inbox, not issue tracker**: `docs/issues.md` is a write-only intake queue — anyone can jot down a problem. Triage diagnoses entries and routes them. Resolved entries are removed. History lives in git log, not in the inbox.
 9. **QA as a gate, not a reporter**: `qa` has the authority to roll back `[x]` tasks that fail verification, append fix tasks for each bug, and enforce the loop's retry rules. Gate behavior is mechanical (see Step 9 of the QA agent).
 10. **Orthogonal QA dimensions**: Every QA finding has a Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED), Coverage (automated/manual/both/none), and Bug attributes (Severity × Kind). Severity drives the loop's retry decisions; Kind is descriptive.
@@ -143,6 +149,7 @@ Issues can also be written to `docs/issues.md` as a persistent intake inbox. `/t
 └── commands/
     ├── design-feature.md           # Design a feature (bootstrap / new PRD / extend / refine)
     ├── dev-cycle.md                # Autonomous loop command (one iteration)
+    ├── report-bug.md               # Conversational bug intake with screenshot support
     ├── triage.md                   # Issue diagnosis and scope assessment
     └── quick-fix.md                # Small-scope bug fix
 ```
@@ -169,7 +176,9 @@ Generated by the loop in any project that uses this setup:
     ├── qa-artifacts/<run-id>/<cuj-id>/run{1,2}/    # <run-id> = iter<N>-<HH-MM-SS>
     │   └── *.png                   # screenshots from the QA walks
     ├── loop-state.md               # iteration counter + last verdict
-    ├── issues.md                   # optional bug intake inbox
+    ├── issues.md                   # bug intake (h3-block format, written by /report-bug)
+    ├── issues-attachments/         # bug screenshots — gitignored, deleted on /quick-fix
+    │   └── <issue-id>-<N>.png      # one per attached screenshot
     └── *-guidelines.md             # optional mandatory rules picked up each cycle
 ```
 
@@ -2391,61 +2400,258 @@ Status: <continue | done | blocked>
 
 ---
 
-## 10. Issues Inbox: `docs/issues.md`
+## 10. Issues Inbox: `docs/issues.md` + `docs/issues-attachments/`
 
-`docs/issues.md` is a lightweight intake queue for bug reports and defects from any source. It is NOT a full issue tracker — it's an inbox that gets emptied as issues are resolved.
+`docs/issues.md` is a lightweight intake queue for bug reports. It is NOT a full issue tracker — it's an inbox that gets emptied as issues are resolved. Screenshots accompanying issues live in `docs/issues-attachments/`, which is **gitignored** (artifacts are transient — deleted with the issue when `/quick-fix` resolves it).
 
 ### Who writes to it
 
 | Source | How |
 |--------|-----|
-| You (the developer) | Write a line directly into the file |
-| Other developers | Write a line, or you transcribe from their report |
-| Users / external | Copy the summary from GitHub Issues, support tickets, etc. |
-| QA agent | QA findings flow through `docs/qa-report.md`, not here — this is for issues discovered *outside* the dev-cycle |
+| You (the developer) | `/report-bug "<description>"` — handles conversational intake, screenshot capture, and writes a structured h3 block |
+| Other developers | Same: hand them `/report-bug` |
+| Users / external | Manually paste their report into a `/report-bug` invocation, or relay screenshots they sent and let the skill format the entry |
+| QA agent | QA findings flow through `docs/qa-report.md`, not here — this inbox is for issues discovered *outside* the dev-cycle |
+
+You CAN still edit `docs/issues.md` by hand if you want to jot something down without conversation — just follow the h3-block format below.
 
 ### Format
 
-Keep it simple — one line per issue, plain language:
+Each issue is an h3 block preceded by a `---` separator. The block carries structured fields; `/triage` appends a `Triage` field to the block; `/quick-fix` removes the block entirely on resolution.
 
 ```markdown
 # Issues
 
-Items are removed after they are triaged and resolved.
-
-- Sort order wrong on articles list — noticed while testing reading flow
-- GH#42: Login fails when email contains a plus sign
-- After adding a new source, the count on dashboard doesn't update until refresh
-```
-
-After `/triage` runs, entries get annotated with scope, recommended action, and root cause:
-
-```markdown
-- Sort order wrong on articles list — **small** → `/quick-fix` — CUJ-003 (prd-000) — `src/services/articles.ts:42`
-- GH#42: Login fails when email contains a plus sign — **medium** → `/quick-fix` + QA — CUJ-001 (prd-000) — `src/auth/validate.ts:18`
-- After adding a new source, the count on dashboard doesn't update until refresh — **large** → `/dev-cycle` — CUJ-012 (prd-002) — needs design review
-```
-
-### Lifecycle
-
-1. Someone writes an issue into the file
-2. `/triage` diagnoses it (adds scope, root cause, CUJ mapping)
-3. `/quick-fix` fixes small/medium issues and removes the entry
-4. Large issues are escalated to `/dev-cycle` — the entry is removed once the dev-cycle picks it up
-5. History lives in git log (`fix:` commits), not in this file
-
-### Rules
-
-- Do NOT use this as a persistent tracker — resolved items are deleted, not moved to a "done" section
-- Do NOT put feature requests here — those go through PM and PRDs
-- Do NOT duplicate QA findings — bugs found during dev-cycle are already in `docs/qa-report.md`
-- This file may not exist if there are no reported issues — that's fine
+Lightweight intake queue. Each issue is an h3 block with structured fields. Removed when resolved (history lives in git via fix: commits).
 
 ---
 
-## 11. Command: Triage (`~/.claude/commands/triage.md`)
+### Issue 2026-06-03-14-30-25: Sort order wrong on articles list
 
-This command diagnoses reported issues, assesses their scope, and recommends the right resolution path.
+- **Filed**: 2026-06-03 14:30:25 (UTC+8)
+- **Description**: Articles in /articles render in random order
+- **CUJ**: CUJ-3 (prd-002-articles)
+- **Expected**: Sorted by date descending
+- **Observed**: Appears random
+- **Repro**: 1. Open /articles. 2. Note order ≠ date desc.
+- **Screenshots**:
+  - docs/issues-attachments/2026-06-03-14-30-25-1.png
+
+---
+
+### Issue 2026-06-03-15-10-02: Login fails on plus-sign email
+
+- **Filed**: 2026-06-03 15:10:02 (UTC+8)
+- **Description**: Submitting a login with an email like alice+test@example.com is rejected with "Invalid email"
+- **CUJ**: CUJ-1 (prd-000)
+- **Expected**: Plus-sign in local part is RFC-valid; should be accepted
+- **Observed**: Client validation rejects before request fires
+- **Repro**: type `a+b@c.com`, click Sign in
+- **Triage** (2026-06-03 15:12:48 (UTC+8)):
+  - **Scope**: small
+  - **Root cause**: `src/auth/validate.ts:18` — regex `^[A-Za-z0-9.]+@` excludes `+`
+  - **Files involved**: `src/auth/validate.ts`
+  - **Recommended action**: `/quick-fix`
+  - **Risk**: low — isolated regex change; add a test case
+```
+
+The Triage block is added by `/triage`. The Screenshots field is optional and only present when the report has visual evidence.
+
+Issue ID format: `YYYY-MM-DD-HH-MM-SS` (filesystem-safe local timestamp), generated by `/report-bug` at filing time. The same ID is the prefix for any screenshot files belonging to the issue.
+
+### Lifecycle
+
+1. `/report-bug` writes the h3 block (and saves screenshots if any).
+2. `/triage` (run separately or chained from `/report-bug`) diagnoses each block and appends its `Triage` field.
+3. `/quick-fix` fixes small/medium-scope blocks, commits with `fix: ...`, **removes the block AND its referenced screenshot files**.
+4. Large/spec-gap/spec-conflict blocks are escalated to `/dev-cycle` or `/design-feature`; the block is removed when the escalation picks it up.
+5. History lives in git log (`fix:` commits), not in this file.
+
+### Rules
+
+- Do NOT use this as a persistent tracker — resolved items are deleted, not moved to a "done" section.
+- Do NOT put feature requests here — those go through `/design-feature`.
+- Do NOT duplicate QA findings — bugs found during the dev-cycle are already in `docs/qa-report.md`.
+- Do NOT commit `docs/issues-attachments/` — `/report-bug` ensures `.gitignore` excludes it. Screenshots are transient evidence, not project history.
+- This file may not exist if there are no reported issues — that's fine; `/report-bug` creates it on first invocation.
+
+---
+
+## 11. Command: Report Bug (`~/.claude/commands/report-bug.md`)
+
+This command captures bug reports — including screenshots — and writes a structured h3 block to `docs/issues.md`. Designed so you can drag/paste screenshots into the chat and have the skill persist them; falls back gracefully to clipboard (`pngpaste`), interactive `screencapture`, or a manual file path.
+
+````markdown
+---
+description: File a bug report into docs/issues.md with optional screenshots. Handles screenshot intake from drag-attached images (multimodal), clipboard via pngpaste, interactive screencapture, or a file path. Writes screenshots to docs/issues-attachments/ (auto-gitignored). Optionally chains into /triage.
+---
+
+# report-bug — File a bug into the inbox
+
+You are filing a bug report. The output is one h3-block entry in `docs/issues.md` plus any screenshots saved to `docs/issues-attachments/`.
+
+This skill owns **intake only**. Diagnosis is `/triage`; fixing is `/quick-fix` or `/dev-cycle`. The skill optionally chains into `/triage` at the end.
+
+## Phase 0: Setup
+
+1. Generate the **issue ID** — local timestamp in filesystem-safe form. Run:
+   ```bash
+   date "+%Y-%m-%d-%H-%M-%S"
+   ```
+   This is the unique ID for this report (e.g., `2026-06-03-14-30-25`). Reuse it for every screenshot filename in this invocation.
+
+2. Generate the **filed timestamp** in human-readable form (used in the issue body). Run:
+   ```bash
+   python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"
+   ```
+
+3. Ensure `docs/issues-attachments/` exists:
+   ```bash
+   mkdir -p docs/issues-attachments
+   ```
+
+4. Ensure `.gitignore` excludes the attachments dir. If `.gitignore` doesn't exist or doesn't contain a line for `docs/issues-attachments/`, append it. The screenshots must not be committed.
+
+## Phase 1: Collect the report
+
+If the user invoked `/report-bug <freeform description>`, use that as the seed for the description. Otherwise open with: "What's broken? Describe it in a sentence or two."
+
+**No `AskUserQuestion`** — this is conversational, like discovery in `/design-feature`. Free-form text Q&A, one or two questions per turn, react to answers.
+
+Collect in this order, building the structured report progressively:
+
+1. **Description** — one-line summary + optional longer detail. Push back on vague: "the dropdown is broken" → "broken how? doesn't open? opens but doesn't filter? shows wrong items?"
+
+2. **Where (CUJ relevance)** — skim `docs/prd/` for plausible CUJs based on the description and propose a candidate: "Sounds like CUJ-3 in prd-002-articles — that's the article-listing journey. Match?" If nothing obvious, ask for a hint (which page/screen/CLI command) or accept `unknown`.
+
+3. **Expected vs Observed** — explicit, concrete. Push back on vague answers the same way `/design-feature` does in discovery.
+
+4. **Repro steps** — only if not obvious from the description. Skip cleanly for purely visual/cosmetic bugs ("just look at the screenshot is enough").
+
+5. **Screenshots** — see Phase 2.
+
+After collection, briefly summarize back and ask "ready to file?" before writing the entry. Don't lock in until the user confirms.
+
+## Phase 2: Screenshot intake
+
+Multiple paths. **Always try these in order**, falling through if a path doesn't yield a screenshot:
+
+### 2a. Drag-attached image in this conversation
+
+If the user attached an image when invoking `/report-bug` (visible to you as multimodal context), you can see it but cannot directly extract bytes via tools. Try to find it on disk by globbing Claude Code's recent cache:
+
+```bash
+# Try candidate cache locations for images created in the last 5 minutes
+find ~/Library/Caches -name "*.png" -mmin -5 2>/dev/null | head -20
+find ~/Library/Application\ Support/Claude -name "*.png" -mmin -5 2>/dev/null | head -20
+find /tmp -maxdepth 2 -name "*.png" -mmin -5 2>/dev/null | head -20
+```
+
+If the glob returns candidates, present them to the user with sizes and timestamps and ask "is this the screenshot you attached?". If confirmed, `cp` it into `docs/issues-attachments/<issue-id>-N.png`. If multiple matches, ask user to pick.
+
+If no candidate is found OR the user says "that's not it" → fall through to 2b. Tell the user briefly what you tried and what's next: "I can see the image you attached but couldn't locate it on disk. Easiest fix: take a fresh screenshot to clipboard with Ctrl+Cmd+Shift+4, then I'll grab it from there."
+
+### 2b. Clipboard via pngpaste
+
+```bash
+pngpaste docs/issues-attachments/<issue-id>-N.png
+echo $?
+```
+
+If pngpaste isn't installed, the exit code will be non-zero with `command not found`. Surface:
+
+> `pngpaste` not installed. For fastest clipboard screenshots install it:
+>   `brew install pngpaste`
+>
+> Or I can capture a new screenshot interactively instead (Phase 2c).
+
+Fall through to 2c.
+
+If pngpaste runs but the clipboard had no image, it produces a 0-byte file or errors. Check the file size:
+```bash
+[ -s docs/issues-attachments/<issue-id>-N.png ] && echo "OK" || rm docs/issues-attachments/<issue-id>-N.png
+```
+
+### 2c. Interactive screencapture
+
+macOS-native, always available, lets the user select a region or window right now:
+
+```bash
+screencapture -i docs/issues-attachments/<issue-id>-N.png
+```
+
+This blocks until the user finishes the selection (or hits Esc to cancel). On cancel, the file won't exist — check before adding it to the issue body.
+
+### 2d. Manual file path
+
+If 2a/2b/2c didn't work or the screenshot the user wants is already saved elsewhere, ask for a path. `cp` it into `docs/issues-attachments/<issue-id>-N.png`.
+
+### 2e. Skip
+
+No screenshot. That's fine — many bugs don't need one (logic bugs, CLI bugs, data bugs).
+
+---
+
+After each successful screenshot capture (any of 2a-2d), **read the saved file** with the Read tool to get a multimodal view of it. Use what you see to enrich the issue body — even if the user gave a one-line description, you can add visual specifics like "screenshot shows the dropdown rendering off-screen below the viewport with truncated 'Lo...' text visible." This makes the report immediately useful to `/triage` later.
+
+After each screenshot, ask: "Got it. Another screenshot? (y/n)" — increment the suffix (`-1`, `-2`, ...) for each.
+
+## Phase 3: Write the entry
+
+Append to `docs/issues.md`. If `docs/issues.md` does not exist, create it with this preamble first:
+
+```markdown
+# Issues
+
+Lightweight intake queue. Each issue is an h3 block with structured fields. Removed when resolved (history lives in git via fix: commits).
+
+---
+```
+
+Then append the new block (preceded by a `---` separator and a blank line):
+
+```markdown
+---
+
+### Issue <issue-id>: <one-line summary>
+
+- **Filed**: <human-readable timestamp from Phase 0>
+- **Description**: <multi-line description; one paragraph is fine>
+- **CUJ**: CUJ-<ID> (<prd-file>) | unknown
+- **Expected**: <expected behavior>
+- **Observed**: <observed behavior>
+- **Repro**: <numbered steps, or "—" if not applicable>
+- **Screenshots**:
+  - docs/issues-attachments/<issue-id>-1.png
+  - docs/issues-attachments/<issue-id>-2.png
+
+  (or omit the **Screenshots** field entirely if there are none)
+```
+
+The `Triage` field is added later by `/triage` — do not include a placeholder for it now.
+
+## Phase 4: Optionally chain to /triage
+
+After writing the entry, ask: "Filed as Issue `<issue-id>`. Run /triage on it now? (y/n)"
+
+- If yes → invoke `/triage <issue-id>` (the orchestrator passes the ID; triage looks up the block).
+- If no → print the issue ID one more time as a parting reference and stop.
+
+## What NOT to do
+
+- **Don't commit screenshots.** Phase 0 ensures `.gitignore` excludes `docs/issues-attachments/`. Never `git add` files from that directory.
+- **Don't skip the gitignore check.** Even if it's the second run and the dir exists, verify the gitignore line is present on every invocation — cheap, prevents accidental commits if the user pulled a fresh checkout.
+- **Don't write incomplete entries.** Description + CUJ-or-unknown + Expected + Observed are required. Screenshots and Repro are optional.
+- **Don't fail silently on missing tooling.** If pngpaste isn't installed, say so and offer the alternative — don't just skip to manual path quietly.
+- **Don't loop indefinitely on screenshots.** Two paths to escape the screenshot phase: user says "skip" or user confirms "no more." Stop there.
+- **Don't pre-triage.** Stay out of root-cause analysis, scope assessment, or fix recommendations. That's `/triage`'s job. Your job is faithful intake.
+````
+
+---
+
+## 12. Command: Triage (`~/.claude/commands/triage.md`)
+
+This command diagnoses reported issues, assesses their scope, and recommends the right resolution path. Appends a structured `Triage` field to the issue block in `docs/issues.md`.
 
 ````markdown
 ---
@@ -2459,8 +2665,9 @@ You are diagnosing reported issues to determine their root cause, scope, and the
 ## Input
 
 Check how you were invoked:
-- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that single issue.
-- **Without arguments**: Read `docs/issues.md` and diagnose all open entries.
+- **With an issue ID** (e.g., `triage 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md`, including its `Screenshots:` field if present, and diagnose only that issue.
+- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that ad-hoc description. Do NOT write anything back to `docs/issues.md` — there's no block to attach to. Just print the diagnosis.
+- **Without arguments**: Read `docs/issues.md` and diagnose every block that doesn't already have a `**Triage**:` field.
 
 If `docs/issues.md` doesn't exist and no description was provided, tell the user there's nothing to triage.
 
@@ -2481,6 +2688,7 @@ Quickly orient yourself:
 - Understand what the code currently does vs. what it should do
 - Identify the specific file(s) and line(s) where the behavior originates
 - If it's a runtime issue and a dev server can be started, start it and verify
+- **If the issue block lists screenshots under `Screenshots:`, read each one with the Read tool** to incorporate the visual evidence into your diagnosis. A screenshot often pinpoints the layout/state where the bug manifests faster than re-reading the code.
 
 **b) Map to requirements**
 - Find which CUJ(s) this issue relates to
@@ -2499,8 +2707,8 @@ Classify as one of five scopes:
 | **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
 | **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
 | **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
-| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/user:pm` (define the feature first) |
-| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → update PRD, report wrong → close as invalid) |
+| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` (Route C extend or Route D refine — let the orchestrator decide) |
+| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → `/design-feature` Route D to refine; report wrong → close as invalid) |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -2522,7 +2730,7 @@ For each issue, print a structured diagnosis:
 **Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /user:pm | ask user
+**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /design-feature | ask user
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
@@ -2534,7 +2742,7 @@ For large-scope issues, additionally explain:
 For spec-gap issues, additionally explain:
 - What behavior the user expects that no CUJ currently defines
 - What questions PM needs to answer before implementation can start
-- Whether this is a net-new feature or an extension of an existing CUJ
+- Whether this is a net-new feature, an extension of an existing CUJ, or a refinement of an existing CUJ — this maps to which `/design-feature` route the user should invoke (B/C/D respectively)
 
 For spec-conflict issues, additionally explain:
 - What the PRD specifies (quote the relevant CUJ step or acceptance criterion)
@@ -2542,27 +2750,51 @@ For spec-conflict issues, additionally explain:
 - The current implementation (does it follow the PRD or not?)
 - Do NOT decide which side is correct — present both and ask the user to resolve
 
-### 4. Update docs/issues.md
+### 4. Update docs/issues.md — append a Triage field to the issue block
 
-After diagnosing, update each entry in `docs/issues.md` with the triage result. Change from raw description to triaged format:
+Each issue in `docs/issues.md` is an h3 block (written by `/report-bug`). After diagnosing, **append a structured `Triage:` field to the bottom of the block**. Do NOT modify the block's existing fields (Description, CUJ, Expected, Observed, Repro, Screenshots) — those are the original report; preserve them.
 
 Before:
-```
-- Sort order wrong on articles list
+```markdown
+### Issue 2026-06-03-14-30-25: Sort order wrong on articles list
+
+- **Filed**: 2026-06-03 14:30:25 (UTC+8)
+- **Description**: Articles in /articles render in random order
+- **CUJ**: CUJ-3 (prd-002-articles)
+- **Expected**: Sorted by date descending
+- **Observed**: Appears random
+- **Repro**: 1. Open /articles. 2. Note order ≠ date desc.
+- **Screenshots**:
+  - docs/issues-attachments/2026-06-03-14-30-25-1.png
 ```
 
 After:
+```markdown
+### Issue 2026-06-03-14-30-25: Sort order wrong on articles list
+
+- **Filed**: 2026-06-03 14:30:25 (UTC+8)
+- **Description**: Articles in /articles render in random order
+- **CUJ**: CUJ-3 (prd-002-articles)
+- **Expected**: Sorted by date descending
+- **Observed**: Appears random
+- **Repro**: 1. Open /articles. 2. Note order ≠ date desc.
+- **Screenshots**:
+  - docs/issues-attachments/2026-06-03-14-30-25-1.png
+- **Triage** (2026-06-03 15:02:11 (UTC+8)):
+  - **Scope**: small
+  - **Root cause**: `src/services/articles.ts:42` — `sort()` callback returns 0 for all comparisons because timestamps are strings
+  - **Files involved**: `src/services/articles.ts`
+  - **Recommended action**: `/quick-fix`
+  - **Risk**: low — isolated to one comparator, no API change
 ```
-- Sort order wrong on articles list — **small** → `/quick-fix` — CUJ-003 (prd-000) — `src/services/articles.ts:42`
-```
 
-The format is: `<description> — **<scope>** → `/<action>` — <CUJ> (<PRD>) — <root cause location>`
+Format rules:
+- Triage timestamp uses the same format as the rest of the project: `YYYY-MM-DD HH:MM:SS (UTC±N)`. Get it via the standard `python3 -c "..."` one-liner used elsewhere.
+- Append `Triage` at the bottom of the block, after the existing fields. Do not rewrite the headline; preserve it verbatim.
+- If a `Triage` field already exists on a block (re-triage), replace the entire `Triage` block with the new one. Don't accumulate.
+- If the issue turns out to be invalid (not a bug, works as designed, can't reproduce), remove the entire h3 block from `docs/issues.md` (including the leading `---` separator and any screenshots referenced in its Screenshots field — delete those files from `docs/issues-attachments/` too). Explain why in the diagnosis output.
 
-Where `<action>` is one of: `/quick-fix`, `/quick-fix` + QA, `/dev-cycle`, `/user:pm`, `ask user`.
-
-Keep it one line per issue. The detail is in the diagnosis output, not in the file.
-
-If an issue from `docs/issues.md` turns out to be invalid (not a bug, works as designed, can't reproduce), remove it from the file and explain why in the output.
+The format on disk is structured for human + agent readability. The diagnosis printed to the conversation (Step 3) is for the user reading now; the field-block in the file is for `/quick-fix` (and the user) to consume later.
 
 ## What NOT to do
 
@@ -2576,9 +2808,9 @@ If an issue from `docs/issues.md` turns out to be invalid (not a bug, works as d
 
 ---
 
-## 12. Command: Quick Fix (`~/.claude/commands/quick-fix.md`)
+## 13. Command: Quick Fix (`~/.claude/commands/quick-fix.md`)
 
-This command fixes small-scope bugs directly — triage, fix, test, commit in one flow.
+This command fixes small-scope bugs directly — triage (or use existing Triage field), fix, test, commit, then remove the resolved block + its screenshots.
 
 ````markdown
 ---
@@ -2592,20 +2824,22 @@ You are fixing a small-scope issue — a clear bug, spec deviation, or defect th
 ## Input
 
 Check how you were invoked:
-- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that issue.
-- **With a pre-triaged issue** (e.g., `quick-fix ISS-001` or context from a prior `/triage` run): Skip to fix using the existing diagnosis.
-- **Without arguments**: Read `docs/issues.md`, pick the first triaged small/medium-scope entry, and fix it.
+- **With an issue ID** (e.g., `quick-fix 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md` and fix it. If the block has a `Triage` field, use it as the diagnosis (verify against current code quickly). If not, run the triage logic from `/triage` inline first.
+- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that ad-hoc description in one shot, without going through `docs/issues.md`.
+- **Without arguments**: Read `docs/issues.md`, pick the first **triaged** small/medium-scope block (one whose `Triage` field shows scope=small or scope=medium), and fix it.
 
 ## Process
 
 ### 1. Triage (if not already done)
 
+If the issue block already has a `Triage` field (because `/triage` ran on it), use that as the diagnosis but verify it's still accurate by quickly reading the relevant code.
+
 If the issue hasn't been triaged yet:
 - Read the relevant source code and CUJs
+- **If the block has a `Screenshots` field, read each screenshot with the Read tool** for visual context before diagnosing.
 - Identify root cause, files involved, and scope
 - If scope is **large**: STOP. Tell the user: "This issue has design implications — recommend using `/dev-cycle` instead." Explain why. Do not attempt the fix.
-
-If the issue was already triaged (from a prior `/triage` run or from a triaged entry in `docs/issues.md`), use that diagnosis but quickly verify it's still accurate by reading the relevant code.
+- If scope is **spec-gap** or **spec-conflict**: STOP. Recommend `/design-feature` (Route C or D) and explain.
 
 ### 2. Plan the fix
 
@@ -2648,9 +2882,18 @@ Refs CUJ-<ID> (<prd-file>)
 <one-line explanation of root cause and what was changed>
 ```
 
-### 7. Update docs/issues.md
+### 7. Clean up the issue + its attachments
 
-If the issue came from `docs/issues.md`, remove the entry. The fix is recorded in git history — the inbox doesn't need to track resolved items.
+If the issue came from `docs/issues.md`:
+
+1. Locate the issue's h3 block in `docs/issues.md`. Note any files listed under its `Screenshots:` field.
+2. **Delete those screenshot files** from `docs/issues-attachments/`. They were transient evidence; the fix is in git, the screenshots are no longer needed.
+3. **Remove the entire h3 block** from `docs/issues.md`, including the leading `---` separator. Be careful not to remove an adjacent issue's separator.
+4. If `docs/issues.md` is now empty (just the preamble), leave the preamble in place — don't delete the file.
+
+The fix is recorded in git history — the inbox doesn't need to track resolved items, and the attachments dir stays clean.
+
+If the issue came from a direct `quick-fix "<description>"` invocation (no block in `docs/issues.md`), there's nothing to clean up — the git commit is the only record.
 
 ## Scope guard
 
@@ -2669,8 +2912,9 @@ Do not push through a large fix just because you started. It's better to stop ea
 - Don't skip running tests
 - Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
 - Don't leave stale entries in docs/issues.md after fixing
+- Don't leave orphaned screenshots in docs/issues-attachments/ — Step 7 deletes them along with the issue block
+- Don't commit screenshots from docs/issues-attachments/ — the directory should already be in .gitignore (created by /report-bug); never bypass that
 ````
-
 ---
 
 ## Prerequisites
@@ -2704,6 +2948,7 @@ Then verify with:
 - `execute tasks` — main agent should read docs/tasks.md and spawn worktree agents
 - `/design-feature "test pitch"` — should detect context (brand-new vs existing project), drive conversational discovery in the main thread, and route to bootstrap / new PRD / extend / refine
 - `/dev-cycle` — should run one full autonomous iteration
-- `/triage "test issue"` — should diagnose the issue and recommend a resolution path
-- `/quick-fix "test issue"` — should triage and fix a small-scope issue
+- `/report-bug "test bug"` — should drive conversational intake, attempt screenshot capture (prompts you through the options), write an h3 block to `docs/issues.md`, and ensure `docs/issues-attachments/` is in `.gitignore`
+- `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks and append a `Triage` field to each
+- `/quick-fix <issue-id>` — should fix the issue and remove the block + its referenced screenshots
 - `/loop /dev-cycle` — should run autonomous iterations until done or blocked

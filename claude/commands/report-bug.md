@@ -1,5 +1,5 @@
 ---
-description: File a bug report into docs/issues.md with optional screenshots. Handles screenshot intake from drag-attached images (multimodal), clipboard via pngpaste, interactive screencapture, or a file path. Writes screenshots to docs/issues-attachments/ (auto-gitignored). Optionally chains into /triage.
+description: File a bug report into docs/issues.md with optional screenshots. Acknowledges that attached images in chat can be seen (multimodal) but not extracted to disk; offers clipboard via pngpaste, an explicit file path, interactive screencapture, or skip. Writes screenshots to docs/issues-attachments/ (auto-gitignored). Optionally chains into /triage.
 ---
 
 # report-bug — File a bug into the inbox
@@ -36,7 +36,7 @@ If the user invoked `/report-bug <freeform description>`, use that as the seed f
 
 Collect in this order, building the structured report progressively:
 
-1. **Description** — one-line summary + optional longer detail. Push back on vague: "the dropdown is broken" → "broken how? doesn't open? opens but doesn't filter? shows wrong items?"
+1. **Description** — one-line summary + optional longer detail. Push back on vague: "the dropdown is broken" then "broken how? doesn't open? opens but doesn't filter? shows wrong items?"
 
 2. **Where (CUJ relevance)** — skim `docs/prd/` for plausible CUJs based on the description and propose a candidate: "Sounds like CUJ-3 in prd-002-articles — that's the article-listing journey. Match?" If nothing obvious, ask for a hint (which page/screen/CLI command) or accept `unknown`.
 
@@ -50,65 +50,58 @@ After collection, briefly summarize back and ask "ready to file?" before writing
 
 ## Phase 2: Screenshot intake
 
-Multiple paths. **Always try these in order**, falling through if a path doesn't yield a screenshot:
+**Honesty up front about tool limits.** When the user attaches an image to the message that invokes `/report-bug`, you can *see* the image — use it freely to enrich the description in Phase 3 — but you **cannot directly extract its bytes to disk** with any available tool. To save the image to `docs/issues-attachments/`, you need either (a) the image still on the system clipboard, (b) an explicit file path on disk from the user, or (c) a fresh capture taken now.
 
-### 2a. Drag-attached image in this conversation
+Tell the user this plainly when relevant. **Do NOT scan the filesystem** (no `find`, no `mdfind`, no broad globs of `~/Library/...` or `/tmp/`) — those are invasive, slow, and unreliable for guessing which file matches an attached image.
 
-If the user attached an image when invoking `/report-bug` (visible to you as multimodal context), you can see it but cannot directly extract bytes via tools. Try to find it on disk by globbing Claude Code's recent cache:
+The intake paths, in order:
 
-```bash
-# Try candidate cache locations for images created in the last 5 minutes
-find ~/Library/Caches -name "*.png" -mmin -5 2>/dev/null | head -20
-find ~/Library/Application\ Support/Claude -name "*.png" -mmin -5 2>/dev/null | head -20
-find /tmp -maxdepth 2 -name "*.png" -mmin -5 2>/dev/null | head -20
-```
+### 2a. Try clipboard once (single command, non-invasive)
 
-If the glob returns candidates, present them to the user with sizes and timestamps and ask "is this the screenshot you attached?". If confirmed, `cp` it into `docs/issues-attachments/<issue-id>-N.png`. If multiple matches, ask user to pick.
-
-If no candidate is found OR the user says "that's not it" → fall through to 2b. Tell the user briefly what you tried and what's next: "I can see the image you attached but couldn't locate it on disk. Easiest fix: take a fresh screenshot to clipboard with Ctrl+Cmd+Shift+4, then I'll grab it from there."
-
-### 2b. Clipboard via pngpaste
+If you suspect the screenshot may be on the clipboard — e.g., the user just took one with Cmd+Ctrl+Shift+4 (screen-to-clipboard shortcut), or they pasted into the chat with Cmd+V — try:
 
 ```bash
-pngpaste docs/issues-attachments/<issue-id>-N.png
-echo $?
+pngpaste docs/issues-attachments/<issue-id>-N.png 2>/dev/null
+[ -s docs/issues-attachments/<issue-id>-N.png ] && echo "OK" || rm -f docs/issues-attachments/<issue-id>-N.png
 ```
 
-If pngpaste isn't installed, the exit code will be non-zero with `command not found`. Surface:
+- If a non-empty file lands, you got it. Done.
+- If pngpaste isn't installed (`command not found`), surface once: "`pngpaste` isn't installed — `brew install pngpaste` enables the fastest clipboard path. Falling through."
+- If the clipboard had no image (0-byte file or non-zero exit), silently fall through to 2b. Don't keep the empty file around.
 
-> `pngpaste` not installed. For fastest clipboard screenshots install it:
->   `brew install pngpaste`
+This is the **only** automatic attempt. If 2a misses, ask the user.
+
+### 2b. Ask the user explicitly how to save the image
+
+If 2a didn't capture anything but the user clearly intended a screenshot (attached an image, said "see attached," described a visual bug, etc.), present three explicit choices in plain text:
+
+> I can see the image you attached, but I can't extract it from chat directly — that's a tool limit. Pick one:
 >
-> Or I can capture a new screenshot interactively instead (Phase 2c).
+> 1. **File path** — if you dragged the image in from Finder, tell me the absolute path. I'll `cp` it in.
+> 2. **Take a fresh capture now** — I'll run `screencapture -i` and you can drag a region or click a window.
+> 3. **Skip** — file the bug without a screenshot. The description + multimodal context I can already see is often enough.
 
-Fall through to 2c.
+Wait for the answer.
 
-If pngpaste runs but the clipboard had no image, it produces a 0-byte file or errors. Check the file size:
-```bash
-[ -s docs/issues-attachments/<issue-id>-N.png ] && echo "OK" || rm docs/issues-attachments/<issue-id>-N.png
-```
+### 2c. "File path" → copy from disk
 
-### 2c. Interactive screencapture
+`cp "<provided-path>" docs/issues-attachments/<issue-id>-N.png`. Then verify file size > 0; if zero, the source was bad — tell the user and re-ask.
 
-macOS-native, always available, lets the user select a region or window right now:
+### 2d. "Take a fresh capture" → screencapture
 
 ```bash
 screencapture -i docs/issues-attachments/<issue-id>-N.png
 ```
 
-This blocks until the user finishes the selection (or hits Esc to cancel). On cancel, the file won't exist — check before adding it to the issue body.
+Blocks until the user finishes the selection (or hits Esc to cancel). On cancel, the file won't exist — re-ask or move on.
 
-### 2d. Manual file path
+### 2e. "Skip" → no screenshot
 
-If 2a/2b/2c didn't work or the screenshot the user wants is already saved elsewhere, ask for a path. `cp` it into `docs/issues-attachments/<issue-id>-N.png`.
-
-### 2e. Skip
-
-No screenshot. That's fine — many bugs don't need one (logic bugs, CLI bugs, data bugs).
+That's fine. Many bugs don't need one (logic bugs, CLI bugs, data bugs). The multimodal context from the in-chat attachment (if any) can still inform the issue body you write in Phase 3.
 
 ---
 
-After each successful screenshot capture (any of 2a-2d), **read the saved file** with the Read tool to get a multimodal view of it. Use what you see to enrich the issue body — even if the user gave a one-line description, you can add visual specifics like "screenshot shows the dropdown rendering off-screen below the viewport with truncated 'Lo...' text visible." This makes the report immediately useful to `/triage` later.
+After each successful save (2a, 2c, or 2d), **read the saved file** with the Read tool to get a multimodal view of what landed on disk (which may differ from the in-chat attachment if the user picked a different file). Use what you see to enrich the issue body — even if the user gave a one-line description, you can add visual specifics like "screenshot shows the dropdown rendering off-screen below the viewport with truncated 'Lo...' text visible." That makes the report immediately useful to `/triage` later.
 
 After each screenshot, ask: "Got it. Another screenshot? (y/n)" — increment the suffix (`-1`, `-2`, ...) for each.
 
@@ -155,9 +148,10 @@ After writing the entry, ask: "Filed as Issue `<issue-id>`. Run /triage on it no
 
 ## What NOT to do
 
+- **Don't scan the filesystem looking for the attached image.** `find`, `mdfind`, and broad globs over `~/Library` or `/tmp` are invasive and unreliable. Use Phase 2's clipboard-try-once, then ask the user.
 - **Don't commit screenshots.** Phase 0 ensures `.gitignore` excludes `docs/issues-attachments/`. Never `git add` files from that directory.
-- **Don't skip the gitignore check.** Even if it's the second run and the dir exists, verify the gitignore line is present on every invocation — cheap, prevents accidental commits if the user pulled a fresh checkout.
+- **Don't skip the gitignore check.** Even on the second run when the dir exists, verify the gitignore line is present on every invocation — cheap, prevents accidental commits if the user pulled a fresh checkout.
 - **Don't write incomplete entries.** Description + CUJ-or-unknown + Expected + Observed are required. Screenshots and Repro are optional.
-- **Don't fail silently on missing tooling.** If pngpaste isn't installed, say so and offer the alternative — don't just skip to manual path quietly.
+- **Don't fail silently on missing tooling.** If pngpaste isn't installed, say so once and offer the alternative — don't just skip to manual path quietly.
 - **Don't loop indefinitely on screenshots.** Two paths to escape the screenshot phase: user says "skip" or user confirms "no more." Stop there.
 - **Don't pre-triage.** Stay out of root-cause analysis, scope assessment, or fix recommendations. That's `/triage`'s job. Your job is faithful intake.

@@ -1569,66 +1569,149 @@ Any known gaps, tech debt, or items flagged for future work.
 
 `````markdown
 ---
-description: Bootstrap a new project — collect a product brief, drive PRD/CUJ design via the pm agent, write a MOCK_BRIEF.md for an external designer agent to consume, and seed docs/ux/README.md with the designer's operating rules.
+description: Bootstrap a new PRD — drive a conversational product-design discovery with the user, collaboratively shape CUJs, then hand the agreed design to the pm agent for full PRD writing. Also writes MOCK_BRIEF.md for an external designer agent and seeds docs/ux/README.md (first PRD only) and docs/status.md.
 ---
 
 # new-project — Kick off a fresh PRD
 
-You are the orchestrator for starting a new project. Drive the brief intake, hand off to the `pm` agent for PRD design, and produce a clean handoff artifact for Claude Desktop to consume when drawing mocks.
+You are the orchestrator and product designer for kicking off a fresh PRD. **You** drive the design conversation with the user in this main thread — open-ended, multi-turn, deep enough that the CUJs end up matching the user's actual intent. Only after the design is agreed do you hand off to the `pm` subagent for the mechanical work of writing the PRD file in the full CUJ template format.
+
+The flow:
+
+- **Phase 0** — Discovery: free-form conversational product design (no `AskUserQuestion`, no subagents). Probe problem/user, value, journeys, scope, form factor, edge cases. React to answers, mirror back, surface tensions.
+- **Phase 0.5** — CUJ shape drafting: propose each CUJ's shape (title + flow paragraph) one at a time, iterate, get explicit confirmation on the set.
+- **Phase 1** — PM subagent expands the confirmed shapes into the full CUJ template and writes `docs/prd/prd-NNN-<slug>.md`, `MOCK_BRIEF.md`, and `docs/prd/index.md`. No re-discovery.
+- **Phase 2** — Seed `docs/ux/README.md` (first PRD only).
+- **Phase 2.5** — Seed `docs/status.md` with the new CUJs as `not started`.
+- **Phase 3** — Hand off to the user.
 
 This skill works in two scenarios:
-- **First PRD in the project** — bootstraps `docs/prd/index.md` and `docs/ux/README.md`.
-- **Subsequent PRDs** — adds the new PRD alongside existing ones, only writes files that don't yet exist.
+- **First PRD in the project** — bootstraps `docs/prd/index.md`, `docs/ux/README.md`, and `docs/status.md`. Full discovery in Phase 0.
+- **Subsequent PRDs** — adds the new PRD alongside existing ones; only writes files that don't yet exist. Phase 0 skips foundational questions (vision, persona, form factor) since prior PRDs already established them — focuses discovery on what's specific to this new feature.
 
-## Phase 0: Collect the product brief
+## Phase 0: Discovery — conversational product design
 
-If the user invoked `/new-project <freeform pitch>`, use that as a seed for the brief.
+**You are the product designer for this conversation.** Drive an open-ended, iterative discovery with the user *before* drafting any CUJs or writing any files. The point is to build deep enough understanding of the user, the problem, and the journeys that the resulting CUJs match the user's actual intent — not to run through a 3-question survey and dump a PRD.
 
-Use `AskUserQuestion` to collect any missing fields. The brief is a small structured record:
+**Detect context first.** Read `docs/prd/index.md` (if it exists) and skim any existing PRDs. If this is the project's first PRD, do full discovery. If there are existing PRDs, the product vision, target user, form factor, and visual style are usually already established — focus discovery on what's specific to *this new feature/PRD* and skip the foundational questions.
 
-- **Product name** (short, memorable — used as the slug)
-- **One-line pitch** (what is it, who it's for, why it exists)
-- **Target user** (who, what context)
-- **Primary problem** (the pain point this addresses)
-- **Form factor** (web desktop / mobile web / both / native — affects mock width and interactions)
-- **Visual style preference** (free text — e.g., "minimal modern", "playful", or "no preference, use defaults")
+If `docs/prd/index.md` exists with a product vision that **contradicts** the user's pitch (e.g., the user is trying to start a different product inside an existing project's repo), stop and ask whether they meant to add a PRD to the existing project or start a separate repo.
 
-Hold the brief in your working memory. Do not write any files yet — `pm` will do that after the design conversation lands.
+**No `AskUserQuestion` tool calls during discovery.** That tool is for structured menu choices. Discovery is free-form text — you write your questions as natural prose, the user replies in natural prose, you respond. The back-and-forth is what makes the design real.
 
-If the user already has a `docs/prd/index.md` with a product vision that contradicts the brief (e.g., they're trying to start a "new project" inside an existing project's repo), stop and ask whether they meant to add a new PRD to the existing project or actually start a separate repo.
+If the user invoked `/new-project <freeform pitch>`, treat that as the opening seed. Otherwise, open with: "What are you building? Give me a paragraph or two — I'll ask follow-ups."
 
-## Phase 1: Drive PRD design via the `pm` agent
+### Dimensions to cover
 
-Spawn a `pm` subagent with the brief embedded in the prompt. Use this prompt (substitute `<brief>` with the structured brief from Phase 0):
+For a **first PRD**, cover all six. For an **additional PRD**, you've usually already covered 1, 2, 5, and 6 from prior PRDs — focus mostly on 3 and 4, dipping into the others only where this feature meaningfully differs.
+
+1. **Problem & user** — Who specifically uses this? When and where? What's the pain? What do they do today as a workaround? Why does the current way fall short? How urgent is this for them?
+2. **Value & differentiation** — What's the one-sentence value prop from the user's POV? What makes this *better* than alternatives — and what does "better" actually mean (faster, cheaper, prettier, more private, more accurate, more accessible)?
+3. **Critical user journeys** — Walk through a real session. What does the user do first? What do they see? What do they feel? How does the session end? Are there 1, 2, or 5+ distinct flows? This is the meat of discovery — spend the most time here.
+4. **Scope** — What's the MVP? What's explicitly NOT in v1? What's the smallest version that would prove this works? What's tempting to add but should wait?
+5. **Form factor & visual style** — Web desktop / web mobile / both / native / CLI? Visual direction (minimal modern, playful, brand-driven, neutral defaults)?
+6. **Edge cases & failure modes** (surface as journeys solidify) — Empty state? Bad input? Network failure? First-time user vs returning? What does an "unhappy path" look like?
+
+### How to drive the conversation
+
+- **One to three questions per turn**, never a 6-item survey. Let the user answer, then respond.
+- **React to every answer.** Repeat back the implication. Surface a tension you noticed. Propose an interpretation and ask "is that right?". Push back on vague answers — "fast in what sense? Initial load? Response time? Under a second, under 100ms?"
+- **Use prior answers to inform later questions.** Don't re-ask. If the user said "for retail managers tracking inventory," your follow-up about journeys should reference inventory tracking concretely.
+- **Name contradictions gently.** "Earlier you said X but this implies Y — which is closer?"
+- **Surface tradeoffs explicitly.** When two design choices are in tension, name both sides and ask which way to lean — don't silently pick.
+- **Mirror back periodically.** After every 2-3 rounds, say "here's what I'm hearing so far" so misunderstandings get caught early instead of propagating into CUJs.
+- **Don't write CUJs yet.** Build the picture; don't lock it in.
+
+### When to wrap discovery
+
+You've covered enough when you can answer all of these in your own words, without re-asking the user:
+- Who is the target user, what's the primary problem, and what's the one-sentence value prop?
+- What's in MVP scope, and what's explicitly out?
+- What are the 3-6 distinct user journeys that together deliver the value prop?
+- What form factor and directional style are you designing for?
+
+When you reach that bar, say something like: "I think I have enough to sketch CUJ shapes. Let me propose a few and we'll iterate."
+
+---
+
+## Phase 0.5: CUJ shape drafting — iterative
+
+Before invoking the `pm` subagent for full formatting, draft the **shape** of each CUJ collaboratively with the user. Still no file writes.
+
+For each CUJ you intend to create, one at a time:
+
+1. **Propose the shape**: title + a one-paragraph description of what happens at a journey level. No full template formatting yet, no acceptance criteria — just the flow in plain prose.
+2. **Ask**: "Is this the right shape? What's missing, wrong, or unclear?"
+3. **Iterate** until the user confirms. Capture any specifics they add — copy strings, edge cases, defaults, visual notes — into your working memory; you'll pass these to the PM subagent.
+
+Once all 3-6 shapes are confirmed, **summarize the set** before moving on:
+
+> Here's the CUJ set we're going to write:
+> - CUJ-N: <title> — <one-line summary>
+> - CUJ-N: <title> — <one-line summary>
+> - ...
+>
+> Ready for me to write up the full PRD?
+
+Get an explicit "yes" before moving to Phase 1.
+
+---
+
+## Phase 1: Hand off to the `pm` subagent for full PRD writing
+
+The discovery and CUJ-shape iteration is **done** at this point. The PM subagent's job is now narrow: convert the agreed shapes into the full CUJ template format and write the files. It must NOT redo discovery.
+
+Spawn a `pm` subagent with the discovery summary + confirmed CUJ shapes embedded in the prompt. Substitute the bracketed sections with your actual collected content:
 
 ```
-You are designing the PRD for a project. Here is the brief:
+You are writing the PRD for a product the user just designed with the
+orchestrator in Phases 0 and 0.5. Discovery is DONE — do not re-ask
+the user about the problem, value prop, scope, form factor, style,
+or what the CUJs should be. Your job is to write up what's already
+agreed.
 
-<brief>
+## Discovery summary
 
-Your responsibilities for THIS invocation:
+[Insert a tight summary of what the discovery conversation established:
+target user, primary problem, value prop, MVP scope, form factor,
+visual style direction. 1-2 paragraphs.]
 
-1. **Bootstrap missing PRD scaffolding**: if `docs/prd/index.md` does
-   not exist, create it with a product vision section, target user
-   section, and an empty PRD listing.
+## Confirmed CUJ shapes
 
-2. **Research**: WebSearch for prior art, competitors, and patterns
-   relevant to this product domain. Cite findings briefly.
+[Insert each CUJ shape — title plus the paragraph-level flow that the
+user confirmed in Phase 0.5. Include any specifics they added: copy
+strings, edge cases, defaults, visual notes.]
 
-3. **Draft 3-6 initial CUJs** using your full CUJ template — be
-   exhaustive per CUJ (Context, Preconditions, Journey Steps with
-   System Response / User Sees / Details, Edge Cases & Error States,
-   Mocks / Reference Designs section with [needs-mocks] flag,
-   Acceptance Criteria).
+## Your responsibilities for THIS invocation
 
-4. **Discuss the draft CUJs with the user**, iterate until aligned.
+1. **Bootstrap missing PRD scaffolding**: if `docs/prd/index.md`
+   does not exist, create it with a product vision section, target
+   user section, and an empty PRD listing — using the discovery
+   summary above as the source.
 
-5. After alignment, write the final files:
+2. **Optional brief research**: WebSearch only if a specific spec
+   detail (e.g., a competitor pattern, a standard format) is needed
+   to make a CUJ concrete. Do NOT redo a discovery-level research
+   pass — the user already knows what they want.
+
+3. **Expand each confirmed CUJ shape into the full CUJ template
+   format** — exhaustive per CUJ (Context, Preconditions, Journey
+   Steps with System Response / User Sees / Details, Edge Cases &
+   Error States, Mocks / Reference Designs with [needs-mocks] flag,
+   Acceptance Criteria as plain bullets — NOT checkboxes).
+
+   - Use the CUJ shape's paragraph as the basis for Journey Steps.
+   - Do NOT invent CUJs that aren't in the agreed shape set.
+   - If a shape leaves something genuinely ambiguous, make a
+     defensible choice and flag it inline with `(assumption — confirm)`
+     so the user can react in review.
+
+4. After writing the PRD, write the final files:
    - `docs/prd/prd-NNN-<slug>.md` (NNN is the next sequential PRD
      number; <slug> is the product-name kebab-cased)
    - Update `docs/prd/index.md` with a new entry
 
-6. **ALSO write `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`** — a
+5. **ALSO write `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`** — a
    self-contained handoff document for the Claude Desktop "UX Mocks"
    Project. Use this exact structure:
 
@@ -1824,10 +1907,14 @@ Substitute the actual paths. Do not editorialize — the user has everything the
 
 ## What NOT to do
 
-- **Don't write the PRD yourself** — delegate every CUJ decision to the `pm` agent. The `pm` agent owns the CUJ template, the interactive discussion with the user, and the writing.
+- **Don't rush Phase 0.** The point of moving discovery out of the PM subagent and into the main thread is that you can have a real, multi-turn product design conversation. If you ask 2 questions and start drafting CUJs, you've failed the user. Stay in discovery until you can describe the user, problem, value prop, scope, and journey set *in your own words* — not just parrot back what the user said.
+- **Don't use `AskUserQuestion` during Phase 0 discovery.** Free-form text dialogue is the whole point. `AskUserQuestion` is fine for menu choices elsewhere; it's the wrong tool for design conversation.
+- **Don't draft CUJs in Phase 0.** Build the picture first. Phase 0.5 is where shapes land.
+- **Don't skip Phase 0.5.** Even if the user pitched concretely, propose the CUJ shapes one at a time and get explicit confirmation per shape before invoking the PM subagent. The PM subagent's job is mechanical writing — it can't re-design what wasn't designed first.
+- **Don't have the PM subagent re-do discovery.** Phase 1's prompt embeds the discovery summary and the confirmed shapes. PM expands shapes into full CUJ template format and writes files — it does NOT re-ask design questions.
+- **Don't write the PRD yourself in the orchestrator.** PM owns the CUJ template formatting and the file writes. You own the conversation, the shapes, and the handoff.
 - **Don't draw mocks** — the entire point of MOCK_BRIEF.md is to hand mock production off to Claude Desktop. Do not generate HTML mocks from this skill or from any agent in this repo.
 - **Don't overwrite an existing `docs/ux/README.md`** — only create it if missing. Subsequent `/new-project` runs skip Phase 2.
-- **Don't skip the visual style question in Phase 0** — even "no preference" is a valid answer that gets captured in the MOCK_BRIEF as "use defaults". The designer needs to know they have latitude.
 `````
 
 ---

@@ -111,38 +111,98 @@ You MUST drive a real browser via the Playwright MCP. If the `mcp__playwright__b
 
 For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk:
 
-1. **Start (or restart) the dev server** using the PID-file lifecycle below. Capture the URL. (You may reuse the same dev server across the two runs; you must NOT reuse the same browser session.)
+1. **Start (or restart) the dev server** using **the canonical project script** below. Capture the URL. (You may reuse the same dev server across the two runs; you must NOT reuse the same browser session.)
 
-   **Dev-server lifecycle — PID-file pattern (use this exactly so the project's permission allowlist can autonomously approve start/stop without prompting).**
+   **Dev-server lifecycle — single canonical script. Use this ONLY. Do not improvise.**
 
-   On first run in the project, ensure `.gitignore` excludes `.qa-dev-server.pid` and `.qa-dev-server.log` (append if missing) — these are transient lifecycle artifacts, never committed.
+   All dev-server lifecycle interactions go through `scripts/qa-server.sh`. The script encapsulates start, stop, status check, and log inspection. The permission allowlist pre-approves `Bash(./scripts/qa-server.sh *)`, so every QA call runs without prompting. **Do not invoke `npm run dev`, `yarn dev`, `kill`, `lsof`, `pkill`, `tail`, or any other process-management command directly during QA — use the script for every operation.** If you need a capability the script doesn't expose, extend the script (Step 1a below); don't invent a one-off command.
 
-   **Start** (one Bash call, no shell redirects in the matched prefix — backgrounded by Claude Code, not by shell `&`):
+   **Step 1a — install the script if it doesn't exist.** Check for `scripts/qa-server.sh` at the start of QA. If missing, create it.
 
-   ```bash
-   nohup npm run dev > .qa-dev-server.log 2>&1 &
-   echo $! > .qa-dev-server.pid
-   ```
-
-   Replace `npm run dev` with the project's actual dev command if different (`yarn dev`, `pnpm dev`, `bun dev`, etc.).
-
-   After starting, wait a few seconds for readiness, then verify the server is responding (`curl -fsS http://localhost:<port>/ > /dev/null && echo ready`). If not ready, read `.qa-dev-server.log` to surface the failure.
-
-   **Stop** (run between QA invocations and at the very end — leaves the project clean):
+   Pick the project's dev command and port by reading `package.json`'s `scripts.dev` (or equivalent) and the dev server's documented default port — fill them into the `DEV_CMD` and `DEV_PORT` lines below before writing the file. Then write `scripts/qa-server.sh` with this exact content (substituting `<DEV_CMD>` and `<DEV_PORT>` with the values you determined):
 
    ```bash
-   kill "$(cat .qa-dev-server.pid)"
-   rm -f .qa-dev-server.pid
+   #!/bin/bash
+   # Canonical dev-server lifecycle for the QA agent.
+   # The QA agent uses this script as its ONLY interface for dev-server
+   # operations. Do not invoke npm/kill/lsof/tail directly during QA.
+   set -e
+
+   DEV_CMD="<DEV_CMD>"            # e.g., "npm run dev", "yarn dev", "pnpm dev", "bun dev"
+   DEV_PORT="<DEV_PORT>"          # e.g., 3000, 5173, 8080
+   PID_FILE=".qa-dev-server.pid"
+   LOG_FILE=".qa-dev-server.log"
+
+   running() {
+     [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+   }
+
+   case "${1:-}" in
+     start)
+       if running; then
+         echo "already running (pid $(cat "$PID_FILE"), port $DEV_PORT). use 'restart' or 'stop' first."
+         exit 1
+       fi
+       rm -f "$PID_FILE"
+       nohup $DEV_CMD > "$LOG_FILE" 2>&1 &
+       echo $! > "$PID_FILE"
+       # Wait for the port to start responding (max ~15s).
+       for i in $(seq 1 30); do
+         if curl -fsS "http://localhost:$DEV_PORT/" > /dev/null 2>&1; then
+           echo "ready (pid $(cat "$PID_FILE"), port $DEV_PORT, log $LOG_FILE)"
+           exit 0
+         fi
+         sleep 0.5
+       done
+       echo "did not become ready in 15s; last log lines:"
+       tail -n 20 "$LOG_FILE"
+       exit 1
+       ;;
+     stop)
+       if [ -f "$PID_FILE" ]; then
+         kill "$(cat "$PID_FILE")" 2>/dev/null || true
+         rm -f "$PID_FILE"
+         echo "stopped"
+       else
+         echo "not running (no $PID_FILE)"
+       fi
+       ;;
+     restart)
+       "$0" stop
+       "$0" start
+       ;;
+     status)
+       if running; then
+         echo "running (pid $(cat "$PID_FILE"), port $DEV_PORT)"
+       else
+         echo "not running"
+         exit 1
+       fi
+       ;;
+     logs)
+       N="${2:-20}"
+       [ -f "$LOG_FILE" ] && tail -n "$N" "$LOG_FILE" || echo "no log yet"
+       ;;
+     *)
+       echo "usage: $0 {start|stop|restart|status|logs [N]}"
+       exit 1
+       ;;
+   esac
    ```
 
-   The `kill "$(cat .qa-dev-server.pid)"` form is intentional: it kills only the PID written when *this* QA run started the server. The allowlist pre-approves this exact prefix, so it runs without prompts. Do NOT substitute `kill $(lsof -ti:<port>)` or bare `kill <pid>` — those don't match the allowlist and will prompt.
+   After writing the script, `chmod +x scripts/qa-server.sh`. Then ensure `.gitignore` excludes `.qa-dev-server.pid` and `.qa-dev-server.log` (append if missing). The script itself **is** committed (project infrastructure); the runtime PID/log files are not.
 
-   **If `.qa-dev-server.pid` already exists** when you go to start (leftover from a prior interrupted run), kill the stale PID first, then proceed. Don't assume the file is fresh.
+   **Step 1b — use the script for every interaction.** During QA:
 
    ```bash
-   [ -f .qa-dev-server.pid ] && kill "$(cat .qa-dev-server.pid)"
-   rm -f .qa-dev-server.pid
+   ./scripts/qa-server.sh start         # before the first walk (also handles stale PIDs)
+   ./scripts/qa-server.sh status        # check between walks if uncertain
+   ./scripts/qa-server.sh logs 50       # inspect last 50 log lines on a failure
+   ./scripts/qa-server.sh restart       # if a walk left the server in a weird state
+   ./scripts/qa-server.sh stop          # after the last walk
    ```
+
+   That's the entire interface. If you find yourself wanting to type `lsof -ti:`, `kill <pid>`, `tail -f`, `pkill`, or any other process command, stop — extend the script instead by adding a new case branch and re-saving the file. Then call the script.
 2. **Navigate**: `mcp__playwright__browser_navigate` to the entry URL specified in the CUJ Preconditions. If the browser binary is missing, run `mcp__playwright__browser_install` once and retry.
 3. **Capture initial state**: `mcp__playwright__browser_snapshot` (accessibility tree) and `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/00-initial.png` (where `<run>` is `run1` or `run2`).
 4. **Walk each Journey Step** from the CUJ spec, in order:

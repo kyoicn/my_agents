@@ -28,7 +28,7 @@ You are invoked by `/gorilla-test`. The orchestrator passes:
 
 ## Prerequisites
 
-You require Playwright MCP to drive a real browser. If the `mcp__playwright__browser_*` tools are missing, write `docs/gorilla-report.md` with status `BLOCKED` naming the install command, and return immediately:
+You require Playwright MCP to drive a real browser. If the `mcp__playwright__browser_*` tools are missing, create the session dir anyway (`mkdir -p docs/gorilla/<session-id>`), write `docs/gorilla/<session-id>/report.md` with status `BLOCKED` naming the install command, and return immediately:
 
 ```
 claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest
@@ -41,8 +41,8 @@ Do not attempt to attack without the browser. Reading source code or guessing ab
 ### 1. Session setup
 
 - Capture session ID and start timestamp.
-- Create `docs/gorilla-artifacts/<session-id>/` for screenshots.
-- Ensure `.gitignore` excludes `docs/gorilla-artifacts/` (append if missing).
+- Create the session directory: `mkdir -p docs/gorilla/<session-id>/screenshots`. The session dir holds this session's `report.md` (committed) and its `screenshots/` subdir (gitignored). Previous sessions live alongside as siblings under `docs/gorilla/` — this is the chronological history.
+- Ensure `.gitignore` excludes `docs/gorilla/*/screenshots/` so every session's screenshots are excluded without touching the committed reports. Append the line if missing — single glob covers all sessions.
 - Verify the dev server is running:
   ```bash
   ./scripts/qa-server.sh status
@@ -90,7 +90,7 @@ You stop when ANY of these fires:
 
 For every reproducible finding, capture evidence as you go (don't defer):
 
-- **Screenshot** at the failure moment via `browser_take_screenshot`, saved to `docs/gorilla-artifacts/<session-id>/<NN>-<short-slug>.png` where `NN` is a zero-padded sequence number (`01`, `02`, ...).
+- **Screenshot** at the failure moment via `browser_take_screenshot`, saved to `docs/gorilla/<session-id>/screenshots/<NN>-<short-slug>.png` where `NN` is a zero-padded sequence number (`01`, `02`, ...).
 - **Console messages** via `browser_console_messages` — any `error`-level entries adjacent to the failure go in the finding.
 - **Network state** via `browser_network_requests` if the failure is request-related.
 - **Exact repro steps** — the sequence of Playwright actions you took. Write them as a numbered list a human could follow with their own browser.
@@ -105,7 +105,7 @@ Track findings in working memory during the attack — don't append to issues.md
 
 ### 5. End of session — write outputs
 
-Two artifacts. The issues.md blocks are the actionable items; the gorilla-report.md is the session summary.
+Two artifacts. The issues.md blocks are the actionable items; the session report (`docs/gorilla/<session-id>/report.md`) is the audit-trail summary for THIS session — never overwritten, lives alongside prior sessions under `docs/gorilla/`.
 
 #### A. `docs/issues.md` — one h3 block per finding
 
@@ -126,7 +126,7 @@ For each finding, generate an issue ID (current timestamp at the moment of writi
   1. <step>
   2. <step>
 - **Screenshots**:
-  - docs/gorilla-artifacts/<session-id>/<NN>-<slug>.png
+  - docs/gorilla/<session-id>/screenshots/<NN>-<slug>.png
 - **Gorilla notes**: <attack category, plus optional file:line hypothesis from post-attack code grep>
 ```
 
@@ -134,9 +134,9 @@ Use the standard timestamp format `YYYY-MM-DD HH:MM:SS (UTC±N)` for the **Filed
 
 **File every reproducible finding regardless of severity.** The dev decides what to fix via `/triage`.
 
-#### B. `docs/gorilla-report.md` — session summary (overwrite each session)
+#### B. `docs/gorilla/<session-id>/report.md` — this session's summary (created fresh; never overwrites prior sessions)
 
-Compact summary of THIS session. Per-finding detail lives in issues.md; this report references issue IDs only.
+Compact summary of THIS session. Per-finding detail lives in issues.md; this report references issue IDs only. Previous sessions' reports sit alongside as `docs/gorilla/<earlier-session-id>/report.md` — preserved, not overwritten. The directory listing of `docs/gorilla/` is your chronological session history.
 
 ```markdown
 # Gorilla Session Report

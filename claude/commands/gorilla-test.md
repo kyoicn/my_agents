@@ -1,5 +1,5 @@
 ---
-description: Adversarial exploratory testing — kick off a gorilla session against the running product. Manual invocation only; you decide when the product is stable enough. Default 30-min time budget, configurable. Optional URL path filter. Files every finding as an h3 block to docs/issues.md regardless of severity; writes session summary to docs/gorilla-report.md.
+description: Adversarial exploratory testing — kick off a gorilla session against the running product. Manual invocation only; you decide when the product is stable enough. Default 30-min time budget, configurable. Optional URL path filter. Files every finding as an h3 block to docs/issues.md regardless of severity; writes the session's summary and screenshots to docs/gorilla/<session-id>/ (one folder per session, previous sessions preserved).
 ---
 
 # gorilla-test — Adversarial exploratory testing
@@ -87,7 +87,8 @@ Execute the full process from your role definition (Steps 1-6):
 5. End of session:
    - Append one h3 block per finding to docs/issues.md (file every finding
      regardless of severity).
-   - Overwrite docs/gorilla-report.md with this session's summary.
+   - Write docs/gorilla/<session-id>/report.md with this session's summary
+     (per-session folder; previous sessions' reports are preserved alongside).
 6. Final clean-up — optional dev-server stop.
 
 Return: a one-paragraph session summary, the list of issue IDs filed
@@ -110,8 +111,9 @@ Findings filed to docs/issues.md (<total> total):
   - <issue-id> [<severity>] <short title>
   - ...
 
-Session summary: docs/gorilla-report.md
-Artifacts: docs/gorilla-artifacts/<session-id>/
+Session folder: docs/gorilla/<session-id>/
+  - report.md         (session summary)
+  - screenshots/      (this session's screenshots; gitignored)
 
 Suggested next step: run /triage to diagnose the new issues, then /quick-fix
 or /dev-cycle per the recommended action on each.
@@ -126,11 +128,11 @@ Lead with the critical finding:
 
   Issue <issue-id>: <title>
   Repro and evidence: docs/issues.md (block <issue-id>)
-  Screenshot:        docs/gorilla-artifacts/<session-id>/<NN>-<slug>.png
+  Screenshot:        docs/gorilla/<session-id>/screenshots/<NN>-<slug>.png
 
 Recommended: address this before further gorilla testing. The session
-report (docs/gorilla-report.md) and any other findings (if the gorilla
-captured them before stopping) are also available.
+folder (docs/gorilla/<session-id>/) contains report.md and any other
+findings the gorilla captured before stopping.
 ```
 
 ### No findings
@@ -138,7 +140,7 @@ captured them before stopping) are also available.
 ```
 Gorilla session <session-id> complete. No reproducible findings in this run.
 
-Session summary: docs/gorilla-report.md
+Session folder: docs/gorilla/<session-id>/
 Coverage: <N> attack categories touched, <total> attacks attempted.
 ```
 

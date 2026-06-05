@@ -111,7 +111,38 @@ You MUST drive a real browser via the Playwright MCP. If the `mcp__playwright__b
 
 For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk:
 
-1. **Start (or restart) the dev server** with `Bash` (e.g., `npm run dev &`, `yarn dev &`). Capture the URL. (You may reuse the same dev server across the two runs; you must NOT reuse the same browser session.)
+1. **Start (or restart) the dev server** using the PID-file lifecycle below. Capture the URL. (You may reuse the same dev server across the two runs; you must NOT reuse the same browser session.)
+
+   **Dev-server lifecycle — PID-file pattern (use this exactly so the project's permission allowlist can autonomously approve start/stop without prompting).**
+
+   On first run in the project, ensure `.gitignore` excludes `.qa-dev-server.pid` and `.qa-dev-server.log` (append if missing) — these are transient lifecycle artifacts, never committed.
+
+   **Start** (one Bash call, no shell redirects in the matched prefix — backgrounded by Claude Code, not by shell `&`):
+
+   ```bash
+   nohup npm run dev > .qa-dev-server.log 2>&1 &
+   echo $! > .qa-dev-server.pid
+   ```
+
+   Replace `npm run dev` with the project's actual dev command if different (`yarn dev`, `pnpm dev`, `bun dev`, etc.).
+
+   After starting, wait a few seconds for readiness, then verify the server is responding (`curl -fsS http://localhost:<port>/ > /dev/null && echo ready`). If not ready, read `.qa-dev-server.log` to surface the failure.
+
+   **Stop** (run between QA invocations and at the very end — leaves the project clean):
+
+   ```bash
+   kill "$(cat .qa-dev-server.pid)"
+   rm -f .qa-dev-server.pid
+   ```
+
+   The `kill "$(cat .qa-dev-server.pid)"` form is intentional: it kills only the PID written when *this* QA run started the server. The allowlist pre-approves this exact prefix, so it runs without prompts. Do NOT substitute `kill $(lsof -ti:<port>)` or bare `kill <pid>` — those don't match the allowlist and will prompt.
+
+   **If `.qa-dev-server.pid` already exists** when you go to start (leftover from a prior interrupted run), kill the stale PID first, then proceed. Don't assume the file is fresh.
+
+   ```bash
+   [ -f .qa-dev-server.pid ] && kill "$(cat .qa-dev-server.pid)"
+   rm -f .qa-dev-server.pid
+   ```
 2. **Navigate**: `mcp__playwright__browser_navigate` to the entry URL specified in the CUJ Preconditions. If the browser binary is missing, run `mcp__playwright__browser_install` once and retry.
 3. **Capture initial state**: `mcp__playwright__browser_snapshot` (accessibility tree) and `mcp__playwright__browser_take_screenshot` saved to `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/00-initial.png` (where `<run>` is `run1` or `run2`).
 4. **Walk each Journey Step** from the CUJ spec, in order:

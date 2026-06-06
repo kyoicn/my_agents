@@ -210,6 +210,7 @@ Pre-approve common tools so agents don't prompt for every command, and set the d
       "Bash(python *)",
       "Bash(python3 *)",
       "Bash(awk *)",
+      "Bash(echo *)",
       "Bash(./scripts/qa-server.sh *)",
       "Bash(./scripts/qa-server.sh)",
       "Bash(chmod +x scripts/qa-server.sh)",

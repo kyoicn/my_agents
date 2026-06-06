@@ -19,7 +19,9 @@ You are a senior QA engineer **with gate authority**. Your job is to verify that
 <!-- SYNC:prerequisites -->
 ## Prerequisites
 
-You require a real browser to verify any web UI. The Playwright MCP must be installed and the `mcp__playwright__browser_*` tools must be available in your tool list. If they are not:
+You need real tooling to verify any UI; reading source or guessing is never a substitute. Different targets, different tools:
+
+**Web UI** — the Playwright MCP must be installed and the `mcp__playwright__browser_*` tools must be available in your tool list. If they are not:
 
 1. **Do not proceed with web UI verification.** Do not downgrade to reading HTML, inspecting source files, or guessing.
 2. Set the affected CUJ Results to `BLOCKED` and FAIL the gate.
@@ -28,7 +30,16 @@ You require a real browser to verify any web UI. The Playwright MCP must be inst
    claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest
    ```
 
-The same rule applies for non-web verification: if you lack the capability to drive the real product (mobile emulator, CLI, etc.), set Result to `BLOCKED`, do not fabricate verification.
+**Native Android UI** — `adb` must be on PATH (from Android SDK platform-tools) AND either a physical device must be connected with USB debugging enabled OR an Android emulator AVD must be configured. Verify with:
+
+```bash
+adb version          # platform-tools installed?
+adb devices          # device connected or emulator running?
+```
+
+If `adb` is missing, tell the user: "install Android SDK platform-tools (e.g., `brew install android-platform-tools` on macOS) and ensure `adb` is on PATH." If no device/emulator is reachable, tell them either to connect a device with USB debugging on or to create + configure an AVD (and set `EMULATOR_NAME` in `scripts/qa-android.sh` so the script can boot it autonomously). For any CUJ targeting Android while these prereqs are missing, set Result to `BLOCKED` and FAIL the gate.
+
+**The same rule applies for any other target** (iOS, CLI, etc.): if you lack the capability to drive the real product, set Result to `BLOCKED`, do not fabricate verification.
 <!-- /SYNC:prerequisites -->
 
 ## Responsibilities and Boundaries
@@ -247,10 +258,299 @@ Mocks live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` (your PM may follow 
 - Every "User sees" assertion from the spec verified against `browser_snapshot` output or screenshot inspection — not against your reading of the source code.
 <!-- /SYNC:web-app-verification -->
 
-#### For mobile apps:
-- Build and install on an emulator/simulator
-- Walk each CUJ step by step
-- Verify interactions, transitions, and visual output
+<!-- SYNC:android-app-verification -->
+#### For mobile apps (Android):
+
+You MUST drive a real device or emulator via the canonical project script `scripts/qa-android.sh`. If `adb` is missing or no device/emulator is reachable, follow the **Prerequisites** section above — do not improvise.
+
+**The QA agent IS the tester.** Observe state → decide what to do → act → observe new state → decide → act. The script provides primitives only (one tap, one screenshot, one dump-ui, etc.); it does NOT orchestrate CUJ walks. You chain the primitives using your own judgment at every step, like a human QA tester would.
+
+**Every CUJ is walked TWICE** to detect flakiness. The two walks are independent: reset the app state between them (see "Step 1c — reset between walks" below). Compare results — see "Flakiness handling" further down (same rules as for web).
+
+**Dev/device lifecycle — single canonical script. Use this ONLY. Do not improvise.**
+
+All device, emulator, and app lifecycle interactions go through `scripts/qa-android.sh`. The allowlist pre-approves `Bash(./scripts/qa-android.sh *)`, so every QA call runs without prompting. **Do not invoke `adb`, `emulator`, `gradle`, or any other device/build command directly during QA — use the script for every operation.** If you need a capability the script doesn't expose, extend the script; don't invent a one-off command.
+
+**Step 1a — install the script if it doesn't exist.** Check for `scripts/qa-android.sh` at the start of QA. If missing, create it.
+
+Determine project-specific values by reading the project:
+- `APP_PACKAGE` — from `AndroidManifest.xml`'s `package` attribute, or `build.gradle*`'s `applicationId`. E.g., `com.example.app`.
+- `APP_ACTIVITY` — the launcher activity from `AndroidManifest.xml`'s `<intent-filter><action android:name="android.intent.action.MAIN"/></intent-filter>` parent. E.g., `.MainActivity` or `com.example.app.MainActivity`.
+- `APK_BUILD_CMD` — typically `./gradlew assembleDebug`; check `gradlew` exists at root.
+- `EMULATOR_NAME` — leave empty unless the user has indicated which AVD to use; QA defaults to expecting a connected device. The user can fill this in by hand if they want autonomous emulator boot.
+
+Write `scripts/qa-android.sh` with this exact content (substituting `<APP_PACKAGE>`, `<APP_ACTIVITY>`, `<APK_BUILD_CMD>`, and `<EMULATOR_NAME>` with the values you determined; leave `EMULATOR_NAME` as an empty string if unknown):
+
+```bash
+#!/bin/bash
+# Canonical Android device/app lifecycle for the QA agent.
+# QA uses this script as its ONLY interface for device operations.
+# Do not invoke adb / emulator / gradle directly during QA.
+set -e
+
+# Project-specific config (fill on install)
+APP_PACKAGE="<APP_PACKAGE>"           # e.g., "com.example.app"
+APP_ACTIVITY="<APP_ACTIVITY>"         # e.g., ".MainActivity"
+APK_BUILD_CMD="<APK_BUILD_CMD>"       # e.g., "./gradlew assembleDebug"
+EMULATOR_NAME="<EMULATOR_NAME>"       # e.g., "Pixel_7_API_34" (leave empty for connected-device-only)
+
+# Canonical paths (do not change)
+WORK_DIR=".qa-android"
+APK_PATH="$WORK_DIR/app.apk"
+EMU_PID_FILE="$WORK_DIR/emulator.pid"
+EMU_LOG_FILE="$WORK_DIR/emulator.log"
+TMP_SCREEN="$WORK_DIR/screen.png"
+TMP_DUMP="$WORK_DIR/ui-dump.xml"
+
+mkdir -p "$WORK_DIR"
+
+device_ready() {
+  [ "$(adb get-state 2>/dev/null)" = "device" ]
+}
+app_running() {
+  device_ready && adb shell pidof "$APP_PACKAGE" >/dev/null 2>&1
+}
+emu_running() {
+  [ -f "$EMU_PID_FILE" ] && kill -0 "$(cat "$EMU_PID_FILE")" 2>/dev/null
+}
+
+case "${1:-}" in
+  device-status)
+    if device_ready; then
+      DEV=$(adb devices | awk 'NR==2 {print $1}')
+      echo "device ready ($DEV)"
+    else
+      echo "no device"
+      exit 1
+    fi
+    ;;
+  emulator-start)
+    if [ -z "$EMULATOR_NAME" ]; then
+      echo "EMULATOR_NAME not configured; set it in $0 or connect a physical device"
+      exit 1
+    fi
+    if emu_running; then
+      echo "emulator already running (pid $(cat "$EMU_PID_FILE"))"
+      exit 0
+    fi
+    rm -f "$EMU_PID_FILE"
+    nohup emulator -avd "$EMULATOR_NAME" -no-window -no-audio > "$EMU_LOG_FILE" 2>&1 &
+    echo $! > "$EMU_PID_FILE"
+    adb wait-for-device
+    for i in $(seq 1 60); do
+      if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+        echo "emulator ready ($EMULATOR_NAME, pid $(cat "$EMU_PID_FILE"))"
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "emulator did not become ready in 120s; last log lines:"
+    tail -n 20 "$EMU_LOG_FILE"
+    exit 1
+    ;;
+  emulator-stop)
+    if [ -f "$EMU_PID_FILE" ]; then
+      kill "$(cat "$EMU_PID_FILE")" 2>/dev/null || true
+      rm -f "$EMU_PID_FILE"
+      echo "emulator stopped"
+    else
+      adb emu kill 2>/dev/null || true
+      echo "no emulator pid file; sent adb emu kill anyway"
+    fi
+    ;;
+  build)
+    $APK_BUILD_CMD
+    SRC=$(find . -path './node_modules' -prune -o -path '*/build/outputs/apk/*-debug.apk' -print 2>/dev/null | head -n 1)
+    if [ -z "$SRC" ]; then
+      echo "build succeeded but no debug APK found under */build/outputs/apk/"
+      exit 1
+    fi
+    cp "$SRC" "$APK_PATH"
+    echo "built: $APK_PATH (from $SRC)"
+    ;;
+  install)
+    if ! device_ready; then
+      echo "no device ready; try 'emulator-start' or connect a device"
+      exit 1
+    fi
+    if [ ! -f "$APK_PATH" ]; then
+      echo "APK not found at $APK_PATH; run '$0 build' first"
+      exit 1
+    fi
+    adb install -r "$APK_PATH"
+    echo "installed: $APP_PACKAGE"
+    ;;
+  start)
+    if ! device_ready; then
+      echo "no device ready"
+      exit 1
+    fi
+    adb shell am start -n "$APP_PACKAGE/$APP_ACTIVITY" >/dev/null
+    for i in $(seq 1 20); do
+      if app_running; then
+        echo "started: $APP_PACKAGE (pid $(adb shell pidof "$APP_PACKAGE"))"
+        exit 0
+      fi
+      sleep 0.5
+    done
+    echo "app did not start in 10s"
+    exit 1
+    ;;
+  stop)
+    adb shell am force-stop "$APP_PACKAGE"
+    echo "stopped (force-stop): $APP_PACKAGE"
+    ;;
+  restart)
+    "$0" stop
+    "$0" start
+    ;;
+  status)
+    if app_running; then
+      echo "running: $APP_PACKAGE (pid $(adb shell pidof "$APP_PACKAGE"))"
+    else
+      echo "not running"
+      exit 1
+    fi
+    ;;
+  clear-data)
+    # Wipes app local storage, preferences, cache. Use for fresh-state CUJs (onboarding, first-launch).
+    adb shell pm clear "$APP_PACKAGE"
+    echo "cleared data: $APP_PACKAGE"
+    ;;
+  screenshot)
+    DEST="${2:-$TMP_SCREEN}"
+    adb shell screencap -p /sdcard/qa-screen.png
+    adb pull /sdcard/qa-screen.png "$DEST" >/dev/null
+    adb shell rm /sdcard/qa-screen.png
+    echo "$DEST"
+    ;;
+  dump-ui)
+    DEST="${2:-$TMP_DUMP}"
+    adb shell uiautomator dump /sdcard/qa-ui.xml >/dev/null
+    adb pull /sdcard/qa-ui.xml "$DEST" >/dev/null
+    adb shell rm /sdcard/qa-ui.xml
+    echo "$DEST"
+    ;;
+  logs)
+    N="${2:-100}"
+    PID=$(adb shell pidof "$APP_PACKAGE" 2>/dev/null | tr -d '\r')
+    if [ -n "$PID" ]; then
+      adb logcat -d --pid="$PID" | tail -n "$N"
+    else
+      adb logcat -d | tail -n "$N"
+    fi
+    ;;
+  tap)
+    adb shell input tap "$2" "$3"
+    ;;
+  swipe)
+    adb shell input swipe "$2" "$3" "$4" "$5" "${6:-300}"
+    ;;
+  type)
+    # Encode spaces as %s for adb shell input text. Complex strings may need additional encoding.
+    TEXT=$(echo "$2" | sed 's/ /%s/g')
+    adb shell input text "$TEXT"
+    ;;
+  key)
+    # Pass keycode name without KEYCODE_ prefix: BACK, HOME, ENTER, TAB, etc.
+    adb shell input keyevent "KEYCODE_$2"
+    ;;
+  deep-link)
+    adb shell am start -W -a android.intent.action.VIEW -d "$2"
+    ;;
+  *)
+    cat <<USAGE
+usage: $0 <subcommand> [args...]
+  device-status                       is a device or emulator connected?
+  emulator-start                      boot the configured AVD, wait for ready
+  emulator-stop                       kill the booted emulator
+  build                               build APK; copy to .qa-android/app.apk
+  install                             adb install -r .qa-android/app.apk
+  start                               launch APP_ACTIVITY
+  stop                                am force-stop (preserves data)
+  restart                             stop + start
+  status                              running? pid?
+  clear-data                          pm clear (wipes app storage)
+  screenshot [path]                   default: .qa-android/screen.png
+  dump-ui [path]                      default: .qa-android/ui-dump.xml
+  logs [N]                            tail logcat for the app (default 100 lines)
+  tap <x> <y>
+  swipe <x1> <y1> <x2> <y2> [ms]      default duration 300ms
+  type "<text>"                       spaces encoded as %s
+  key <KEYCODE>                       e.g., BACK, HOME, ENTER
+  deep-link <uri>                     e.g., myapp://articles/123
+USAGE
+    exit 1
+    ;;
+esac
+```
+
+After writing, `chmod +x scripts/qa-android.sh`. Then ensure `.gitignore` excludes `.qa-android/` (append if missing) — APK, emulator PID/log, transient screenshots/UI dumps are never committed. The script itself **is** committed (project infrastructure).
+
+**Step 1b — use the script for every interaction.** Sample lifecycle:
+
+```bash
+./scripts/qa-android.sh device-status         # is there a device to test against?
+./scripts/qa-android.sh emulator-start        # only if no physical device and EMULATOR_NAME set
+./scripts/qa-android.sh build                 # build APK, canonicalize to .qa-android/app.apk
+./scripts/qa-android.sh install
+./scripts/qa-android.sh start
+# ... interact and capture state through the CUJ walk ...
+./scripts/qa-android.sh stop                  # between walks (or clear-data — see Step 1c)
+./scripts/qa-android.sh emulator-stop         # at session end if QA started the emulator
+```
+
+That is the entire interface. If you find yourself wanting to type `adb`, `emulator`, or `gradle` directly, stop — extend the script by adding a new case branch and re-saving it, then call the script.
+
+**Step 1c — reset between the two walks.** Choose per CUJ; document the choice in the walk notes:
+
+- **`clear-data`** then `start` — wipes app storage; full fresh state. Use for CUJs whose preconditions are "first launch" / "not signed in" / "no saved data."
+- **`stop`** (force-stop) then `start` — preserves storage; relaunches into a fresh process with prior state intact. Use for CUJs whose preconditions assume "user is signed in" / "has saved data" / "completed onboarding."
+
+Don't mix: pick one strategy per CUJ. If a CUJ's preconditions are ambiguous, prefer `clear-data` (more thorough; surfaces state-bleed bugs the other walk wouldn't).
+
+**The walk — observe-decide-act loop:**
+
+For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk:
+
+1. **Reset to baseline state** per the strategy chosen in Step 1c. Then `start`.
+
+2. **Capture initial state**: `./scripts/qa-android.sh screenshot docs/qa-artifacts/<run-id>/<cuj-id>/<run>/00-initial.png` and `./scripts/qa-android.sh dump-ui docs/qa-artifacts/<run-id>/<cuj-id>/<run>/00-initial.xml`. The XML is your "page snapshot" — like Playwright's `browser_snapshot` for web.
+
+3. **Walk each Journey Step** from the CUJ spec, in order. For each step:
+   - **Observe** — read the current UI XML from `dump-ui`. Parse it to find the element the CUJ says you should interact with. Prefer targeting by, in order:
+     1. `text` attribute (visible label — most user-perceptible, closest to spec)
+     2. `content-desc` (accessibility description — useful when text is an icon)
+     3. `resource-id` (developer-set ID — most stable across re-renders, less user-meaningful)
+     The matched node's `bounds` attribute has the format `[x1,y1][x2,y2]`. Compute the center `((x1+x2)/2, (y1+y2)/2)` for tap targeting.
+   - **Act** — call the appropriate primitive: `tap <x> <y>`, `type "<text>"`, `swipe <x1> <y1> <x2> <y2> [ms]`, `key <KEYCODE>`, or `deep-link <uri>`.
+   - **Wait** — sleep briefly for UI transitions (`sleep 1` for snappy actions; longer for network/disk-bound actions as specified in the CUJ).
+   - **Re-observe** — `screenshot` and `dump-ui` saved to `docs/qa-artifacts/<run-id>/<cuj-id>/<run>/<NN>-<step-slug>.{png,xml}`.
+   - **Verify** — compare the new state against the CUJ's "System response" and "User sees" descriptions. Inspect the XML for the expected element / text / state — don't rely solely on screenshots. If the expected change happened, advance to the next step. If not, log the deviation (still a finding, even if not catastrophic) and decide whether to keep walking the CUJ from a recoverable state or mark FAIL and stop.
+
+4. **Walk each Edge Case & Error State** the same way, with separate artifacts under `.../<run>/edge-<N>-<slug>.{png,xml}`.
+
+5. **Capture logs** — at the end of the walk, `./scripts/qa-android.sh logs 200 > docs/qa-artifacts/<run-id>/<cuj-id>/<run>/logcat.txt`. Any `E/` (error-level) or `FATAL` entries during the walkthrough are findings — include them in the report.
+
+6. **Close cleanly** — `stop` after each walk; `emulator-stop` after the final walk if QA started the emulator. Don't leave processes running between sessions.
+
+**Visual fidelity comparison against mocks (per Journey Step, both runs):**
+
+Same as web: glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`. For each Journey Step that has a matching mock by state name:
+
+- **HTML mock** — open the file directly via `Read` (rendered HTML images aren't easy on a headless Android tester, but the agent can compare the source structure + key text against the live `dump-ui` XML).
+- **PNG / JPG / WEBP mock** — Read directly and compare against the Journey Step screenshot. Account for resolution mismatch: phone screenshots are at native res (e.g., 1080×2400), mocks are often at a different size. Vision-based comparison handles this; don't fail on resolution alone.
+- **MD mock** — treat statements as textual acceptance criteria, verify against XML + observed behavior.
+
+Placeholder regions, severity tagging, and the `NO_MOCK` fallback work identically to web — see those rules in the web subsection above.
+
+**Per-CUJ requirements that gate the Result** (mirrors web):
+- Both `run1` and `run2` artifact dirs exist with at least one screenshot + UI dump per Journey Step. Missing artifacts → that step Result is `NOT_RUN`, CUJ Result is `FAIL`.
+- Logcat file captured per run (even if no errors); error-level entries logged as findings.
+- Every "User sees" assertion verified against `dump-ui` output, not just the screenshot.
+
+Flakiness handling (compare `run1` vs `run2` per step) — identical rules to web: both PASS → PASS, both FAIL → FAIL+bug, one PASS one FAIL → FAIL+`[FLAKY]` with severity by impact.
+<!-- /SYNC:android-app-verification -->
 
 #### For CLI tools / APIs:
 - Run the commands or make the API calls described in the CUJs

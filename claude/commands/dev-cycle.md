@@ -26,11 +26,11 @@ Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `
 
 ## Mocks Check
 
-Mock production happens outside this loop (typically Claude Desktop with filesystem access to this repo) and is consumed by QA in Phase 4 for visual-fidelity comparison. Surface missing mocks now so the user can produce them before QA runs, rather than discovering `NO_MOCK` silently after the fact.
+Mocks are normally produced during `/design-feature` Phase 0.5 alongside CUJ shape iteration — every CUJ that exited `/design-feature` should already have at least one mock file under `docs/ux/<prd-dir>/`. This check surfaces any CUJ that's missing mocks (typically: backfilled PRDs from `/organize-project` that didn't go through `/design-feature`, or CUJs added by manual `/user:pm` invocation without the conversational mock flow).
 
 1. Identify in-scope CUJs:
-   - **Scoped mode**: `[ ]` CUJs in the target PRD
-   - **Unscoped mode**: `[ ]` CUJs across all active PRDs
+   - **Scoped mode**: CUJs in the target PRD
+   - **Unscoped mode**: CUJs across all active PRDs
 
 2. For each in-scope CUJ, glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
 
@@ -38,19 +38,17 @@ Mock production happens outside this loop (typically Claude Desktop with filesys
 
 4. Otherwise, list the CUJs missing mocks and use `AskUserQuestion` to ask the user to choose:
    - **Proceed without fidelity check** — QA will log `NO_MOCK` for these CUJs and skip visual comparison; functional verification still runs.
-   - **Pause** — stop the cycle here so mocks can be produced externally.
+   - **Pause** — stop the cycle here so mocks can be produced via `/design-feature` Route D (refine the affected CUJs to add mocks).
 
-   Include the Claude Desktop handoff prompt verbatim so the user can paste it immediately:
+   The handoff is just the slash-command invocation:
 
    ```
-   Please produce mocks. First read docs/ux/README.md for your designer
-   rules, then read docs/ux/<prd-dir>/MOCK_BRIEF.md. Produce one HTML at
-   a time per the rules and save each into docs/ux/<prd-dir>/.
+   /design-feature
    ```
 
-   Substitute `<prd-dir>` with the actual mockups directory for the affected PRDs (one prompt per PRD if multiple are affected).
+   Then describe to the orchestrator that you want to add mocks for CUJ-<X>, CUJ-<Y> in prd-NNN-<slug> (Route D — refine). The orchestrator will walk through each CUJ's shape (confirming it matches what's already specified), produce the mocks, and save them under `docs/ux/<prd-dir>/`.
 
-5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after producing mocks.
+5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after running `/design-feature` to add the mocks.
 
 ---
 

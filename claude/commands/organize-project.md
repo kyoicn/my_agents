@@ -1,5 +1,5 @@
 ---
-description: Bring an existing project (built without this multi-agent setup) into conformance with the patterns expected by /dev-cycle, /design-feature, and the rest. Audits scattered docs broadly (not just canonical paths), reconciles them per user choice (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (scripts/qa-server.sh, .gitignore, docs/ux/README.md), derives design docs from code via the tl agent, backfills PRDs that describe what's actually built via the pm agent, and seeds docs/status.md. Idempotent — safe to re-run; preserves anything already at canonical paths.
+description: Bring an existing project (built without this multi-agent setup) into conformance with the patterns expected by /dev-cycle, /design-feature, and the rest. Audits scattered docs broadly (not just canonical paths), reconciles them per user choice (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (scripts/qa-server.sh, .gitignore), derives design docs from code via the tl agent, backfills PRDs that describe what's actually built via the pm agent (mocks are NOT auto-generated — user runs /design-feature Route D later to add mocks where they want visual fidelity), and seeds docs/status.md. Idempotent — safe to re-run; preserves anything already at canonical paths.
 ---
 
 # organize-project — Bring an existing project into the multi-agent pattern
@@ -13,10 +13,10 @@ The flow:
 - **Phase 0** — Audit broadly: catalog all markdown files anywhere in the project, classify by content and filename heuristics (PRD-like, design-like, README, status, other).
 - **Phase 1** — Confirm product context conversationally: target user, primary problem, value prop, MVP scope.
 - **Phase 1.5** — Reconcile existing docs: per-document user decision (migrate / adopt / preserve / ignore).
-- **Phase 2** — Bootstrap infrastructure mechanically: `mkdir -p` canonical dirs, write `docs/ux/README.md`, create `scripts/qa-server.sh`, update `.gitignore`.
+- **Phase 2** — Bootstrap infrastructure mechanically: `mkdir -p` canonical dirs, create `scripts/qa-server.sh`, update `.gitignore`.
 - **Phase 3** — Derive design docs via the `tl` agent: read existing code + adopted/migrated design content, write `docs/design/system.md` + per-component `design-<slug>.md`.
 - **Phase 4** — Propose feature → PRD mapping conversationally: group detected features into proposed PRDs, get user confirmation. Skip features already covered by existing canonical PRDs.
-- **Phase 5** — Backfill PRDs via the `pm` agent (one invocation per PRD, sequential): read the relevant code + adopted/migrated PRD-like content, generate CUJs that describe what's actually built, write `prd-NNN-<slug>.md` + `MOCK_BRIEF.md` (with `[needs-mocks]` flag), update `docs/prd/index.md`.
+- **Phase 5** — Backfill PRDs via the `pm` agent (one invocation per PRD, sequential): read the relevant code + adopted/migrated PRD-like content, generate CUJs that describe what's actually built, write `prd-NNN-<slug>.md`, update `docs/prd/index.md`. **Mocks are not auto-generated** — backfilled CUJs describe existing code, so visual fidelity isn't enforced until you actively want it. The CUJs' "Mocks / Reference Designs" sections state "No mocks (backfilled from existing impl — run /design-feature Route D to add mocks if visual fidelity matters)."
 - **Phase 6** — Seed `docs/status.md` via the `status` agent: all CUJs enter with Impl=`merged`, QA=`—`, PM=`—`.
 - **Phase 7** — Hand off with summary and suggested next step.
 
@@ -57,7 +57,6 @@ For each canonical location, record whether it exists:
 - `docs/prd/prd-NNN-*.md` (list any present)
 - `docs/design/system.md`
 - `docs/design/design-*.md` (list any present)
-- `docs/ux/README.md`
 - `docs/status.md`
 - `scripts/qa-server.sh`
 - `.gitignore` (and whether it already excludes `.qa-dev-server.{pid,log}`, `docs/issues-attachments/`, `docs/gorilla/*/screenshots/`)
@@ -134,11 +133,9 @@ Skip steps for anything already present. Apply only the missing pieces.
 
    If the file already exists, leave it alone (Phase 5's PM agent will update its PRD listing as PRDs are backfilled).
 
-3. **`docs/ux/README.md`** — write only if missing. Use the same designer-rules content `/design-feature` Phase 2 writes. (Reference: that content is in `claude/commands/design-feature.md` Phase 2.)
+3. **`scripts/qa-server.sh`** — write only if missing. Use the canonical template from `claude/agents/qa.md` Step 1a, filling in `DEV_CMD` and `DEV_PORT` from Phase 0 detection. `chmod +x scripts/qa-server.sh` after writing.
 
-4. **`scripts/qa-server.sh`** — write only if missing. Use the canonical template from `claude/agents/qa.md` Step 1a, filling in `DEV_CMD` and `DEV_PORT` from Phase 0 detection. `chmod +x scripts/qa-server.sh` after writing.
-
-5. **`.gitignore`** — append any of these lines that aren't already present:
+4. **`.gitignore`** — append any of these lines that aren't already present:
    ```
    .qa-dev-server.pid
    .qa-dev-server.log
@@ -241,8 +238,8 @@ For each user-facing journey you observe in the code:
 
 1. Write a CUJ in your full template format (Context, Preconditions,
    Journey Steps with System Response / User Sees / Details, Edge Cases
-   & Error States, Mocks / Reference Designs with [needs-mocks] flag,
-   Acceptance Criteria as plain bullets).
+   & Error States, Mocks / Reference Designs, Acceptance Criteria as
+   plain bullets).
 
 2. The Journey Steps should describe what happens in the running product
    today. If you observe something in the code that's broken or
@@ -251,12 +248,14 @@ For each user-facing journey you observe in the code:
 
 3. Each acceptance criterion must be observable in the running product.
 
+4. In the "Mocks / Reference Designs" section, state:
+   "No mocks (backfilled from existing impl — run /design-feature
+   Route D to add mocks if visual fidelity matters)."
+   Do NOT generate mocks here. They're a separate, user-driven step
+   if/when the user wants visual fidelity testing for this feature.
+
 Then:
 - Write docs/prd/prd-NNN-<slug>.md
-- Write docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md following the
-  /design-feature structure. Include the [needs-mocks] flag on every
-  CUJ — no mocks were drawn pre-implementation, so visual fidelity
-  testing will need them produced later.
 - Update docs/prd/index.md with a new entry. If the index doesn't yet
   list the PRD, add it under the "PRD listing" section.
 
@@ -294,9 +293,7 @@ Project organized.
 
 Created:
 - docs/prd/index.md (vision, persona, PRD listing with N PRDs)
-- docs/prd/prd-NNN-<slug>.md × N
-- docs/ux/<prd-dir>/MOCK_BRIEF.md × N (with [needs-mocks] flag)
-- docs/ux/README.md (designer rules)
+- docs/prd/prd-NNN-<slug>.md × N (no mocks — backfilled from impl)
 - docs/design/system.md
 - docs/design/design-<slug>.md × N
 - docs/status.md (X CUJs at Impl=merged, QA=—, PM=—)
@@ -313,9 +310,10 @@ review. Expect findings — the impl predates the spec, so QA may surface
 gaps between code and the backfilled CUJs. Address them with /quick-fix
 or refine the PRDs via /design-feature Route D as needed.
 
-For visual fidelity checking, produce mocks via Claude Desktop using
-the MOCK_BRIEF.md files (one per PRD). The handoff prompt is in each
-MOCK_BRIEF.md.
+If you want visual fidelity testing for any CUJ, run `/design-feature`
+and pick Route D — the conversational PM agent will walk through the
+existing CUJ, draw mocks for the agreed states, and save them under
+`docs/ux/<prd-dir>/`. Backfilled CUJs ship without mocks by default.
 ```
 
 If the project was already mostly organized and the skill did little ("idempotent re-run"), say so honestly:

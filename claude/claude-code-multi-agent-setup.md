@@ -9,10 +9,9 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 **Feature development (full pipeline, autonomous):**
 
 ```
-/design-feature ──► PM (PRD design via CUJs, writes/updates docs/ux/MOCK_BRIEF.md)
-                                       │
-                          (external designer produces mocks
-                           via Claude Desktop → docs/ux/)
+/design-feature ──► PM (conversational design of CUJ shapes AND HTML mocks
+                        in lockstep — mocks saved to docs/ux/<prd-dir>/
+                        during the design session; PRD references them)
                                        │
               ┌────────────────  /dev-cycle  ───────────────┐
               │                                             │
@@ -57,7 +56,7 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 
 | Agent | Role | Maintains |
 |-------|------|-----------|
-| `pm` | Product manager — designs features through CUJs, conducts research, defines requirements, and reviews implemented work against the spec | `docs/prd/` (index + feature PRDs), `docs/ux/<prd-dir>/MOCK_BRIEF.md` |
+| `pm` | Product manager + designer — drives feature discovery, produces CUJ shapes AND HTML mocks in lockstep during `/design-feature` sessions, writes PRDs, and reviews implemented work against intent | `docs/prd/` (index + feature PRDs), `docs/ux/<prd-dir>/cuj-*.{html,...}` (mock files) |
 | `tl` | Software architect — designs systems, makes technical decisions, produces rigorous design docs, and conducts code quality reviews | `docs/design/` (`system.md` + per-component design docs) |
 | `planner` | Task decomposer — breaks work into parallelizable tasks; stateless (rewrites `docs/tasks.md` each invocation) | `docs/tasks.md` |
 | `qa` | QA engineer with **gate authority** — runs tests, drives a real browser via Playwright, walks each CUJ twice for flakiness detection, identifies fabrications, compares against mocks under `docs/ux/`, and rolls back tasks that fail verification | `docs/qa-report.md` |
@@ -68,13 +67,13 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 
 | Command | Purpose |
 |---------|---------|
-| `/design-feature` | Design a product feature conversationally. Routes to one of four outcomes based on context and pitch: **A** bootstrap brand-new project (full discovery + first PRD + designer-rules seed), **B** new PRD in existing project, **C** extend an existing PRD with new CUJs, **D** refine existing CUJs in place. Always produces / updates the per-PRD `MOCK_BRIEF.md` for the external designer (typically Claude Desktop with filesystem access) and updates `docs/status.md` |
+| `/design-feature` | Design a product feature conversationally. Routes to one of four outcomes based on context and pitch: **A** bootstrap brand-new project (full discovery + first PRD), **B** new PRD in existing project, **C** extend an existing PRD with new CUJs, **D** refine existing CUJs in place. **CUJ shapes AND HTML mocks are produced together** during the design conversation — the same agent that drives the discovery draws the mocks, save them under `docs/ux/<prd-dir>/`, and includes the file path in every response so the user can `open` it. No external designer / no `MOCK_BRIEF.md` handoff. Also updates `docs/status.md` |
 | `/dev-cycle` | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict |
 | `/report-bug` | Conversational bug intake. Captures description, expected/observed, CUJ link, and screenshots (tries drag-attached → clipboard via `pngpaste` → interactive `screencapture` → manual path). Writes an h3 block to `docs/issues.md` and saves screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
 | `/triage` | Diagnose issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or a freeform description). Appends a structured `Triage` field — scope, root cause, files, recommended action, risk — to the block. Recommended action is one of `/quick-fix`, `/dev-cycle`, `/design-feature`, or ask user |
 | `/quick-fix` | Fast-path fix for small/medium-scope issues. Operates on a `docs/issues.md` block by ID (uses its existing Triage field if present) or on an ad-hoc description. Removes the resolved block and its screenshots from `docs/issues-attachments/` after committing. Escalates if scope expands mid-fix |
 | `/gorilla-test` | Manual-only adversarial exploratory test session against the running product. `--time <30m\|1h\|...>` (default 30m, max 4h), optional `--path </articles>` to focus on a URL subtree. Spawns the `gorilla` agent with no CUJ/spec context; agent walks the attack taxonomy and files every finding to `docs/issues.md`. Per-session output (report + screenshots) lands in `docs/gorilla/<session-id>/` — previous sessions are preserved as a chronological audit trail; `docs/gorilla/*/screenshots/` is gitignored |
-| `/organize-project` | One-time-per-project skill to retrofit an existing project (built without this multi-agent setup) into the canonical pattern. Audits scattered docs broadly (not just canonical paths), reconciles per-doc with the user (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (`scripts/qa-server.sh`, `.gitignore` lines, `docs/ux/README.md`), derives design docs from code via `tl`, backfills PRDs that describe what's actually built via `pm`, and seeds `docs/status.md` with Impl=`merged`/QA=`—`/PM=`—`. **Idempotent** — re-runnable; preserves anything already at canonical paths |
+| `/organize-project` | One-time-per-project skill to retrofit an existing project (built without this multi-agent setup) into the canonical pattern. Audits scattered docs broadly (not just canonical paths), reconciles per-doc with the user (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (`scripts/qa-server.sh`, `.gitignore` lines), derives design docs from code via `tl`, backfills PRDs that describe what's actually built via `pm`, and seeds `docs/status.md` with Impl=`merged`/QA=`—`/PM=`—`. Mocks are NOT auto-generated — user runs `/design-feature` Route D later for any CUJ where visual fidelity matters. **Idempotent** — re-runnable; preserves anything already at canonical paths |
 
 ### The workflows
 
@@ -82,17 +81,18 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 ```
 /design-feature "<freeform pitch>"  → conversational discovery in the main thread;
                                       orchestrator decides route (A/B/C/D) and
-                                      confirms with user; pm subagent writes/extends/
-                                      refines docs/prd/... and docs/ux/.../MOCK_BRIEF.md;
-                                      docs/status.md is updated route-aware;
-                                      docs/ux/README.md is seeded only on first run.
+                                      confirms with user; same agent produces CUJ
+                                      shapes AND HTML mocks in lockstep, saving
+                                      mocks to docs/ux/<prd-dir>/ during the session;
+                                      pm subagent then writes/extends/refines the
+                                      PRD referencing the saved mocks; docs/status.md
+                                      is updated route-aware.
 ```
-Then open Claude Desktop (or any chat agent with filesystem access to the repo) and paste the handoff prompt that `/design-feature` prints (route-specific — for new mocks, refresh of extended mocks, or redraw of stale mocks). The external designer reads `docs/ux/README.md` for operating rules and `MOCK_BRIEF.md` for the per-PRD spec, then produces one HTML mock at a time into `docs/ux/<prd-dir>/`.
+During the session, the agent saves each mock to disk and includes the absolute file path in its response. You open the file in your browser (`open <path>` on macOS) to see what was drawn; refresh on each revision. No external designer involved — everything happens in the one `/design-feature` conversation.
 
 **Feature development (autonomous):**
 ```
-/design-feature "<pitch>"           # design the feature, route as appropriate
-[produce mocks in Claude Desktop]   # external; reads docs/ux/README.md + MOCK_BRIEF
+/design-feature "<pitch>"           # design the feature + draw mocks together
 /loop /dev-cycle                    # runs the full loop autonomously until done or blocked
 ```
 
@@ -132,7 +132,7 @@ The three-stage pipeline (`report → triage → fix-or-escalate`) is well-facto
 10. **Orthogonal QA dimensions**: Every QA finding has a Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED), Coverage (automated/manual/both/none), and Bug attributes (Severity × Kind). Severity drives the loop's retry decisions; Kind is descriptive.
 11. **Two-run flakiness detection**: QA walks every CUJ twice with a fresh browser session. Inconsistent results between the runs are logged as `[FLAKY]` and treated pessimistically as FAIL — catching the failures that hide on a single pass.
 12. **Visual fidelity via mocks under `docs/ux/`**: Mocks live at `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>`. QA discovers them by glob, compares to the running product side-by-side, and logs `[VISUAL_DEVIATION]` findings by severity. Missing mocks → log `NO_MOCK`, continue without blocking.
-13. **Mocks produced outside the code-side loop**: The dev-cycle does not draw mocks. `/design-feature` writes or updates a `MOCK_BRIEF.md` for an external designer agent (typically Claude Desktop with filesystem access), and the designer follows the operating rules in `docs/ux/README.md`. `/dev-cycle`'s Mocks Check surfaces gaps before QA runs.
+13. **Mocks produced during design, not as an async handoff**: The same `pm` agent that drives `/design-feature`'s discovery and CUJ-shape iteration also produces the HTML mocks — synchronously, in lockstep with shape iteration. Mocks save to `docs/ux/<prd-dir>/cuj-<id>-<state>.html`. The dev-cycle's Mocks Check is a fallback for CUJs that never went through `/design-feature` (e.g., backfilled by `/organize-project`); when found, it points the user to `/design-feature` Route D to add the mocks.
 14. **Deterministic verdict**: `/dev-cycle`'s final phase derives DONE/CONTINUE/BLOCKED mechanically from the QA verdict + remaining `[ ]` CUJs after PM review. No additional agent call needed.
 
 ---
@@ -172,10 +172,8 @@ Generated by the loop in any project that uses this setup:
     │   ├── system.md               # cross-cutting design (canonical name)
     │   └── design-<slug>.md        # per engineering component
     ├── ux/
-    │   ├── README.md               # designer operating rules
     │   └── prd-NNN-<slug>-mockups/
-    │       ├── MOCK_BRIEF.md       # per-PRD mock spec
-    │       └── cuj-<id>-<state>.html
+    │       └── cuj-<id>-<state>.html  # mocks produced by pm during /design-feature
     ├── tasks.md                    # planner output; overwritten each cycle
     ├── status.md                   # status agent output
     ├── qa-report.md                # QA agent output
@@ -414,16 +412,15 @@ Why this journey matters. What user problem does it solve? When does the user en
 - <Scenario>: ...
 
 #### Mocks / Reference Designs
-[needs-mocks] <-- include this flag if mocks have not yet been produced for this CUJ
 
-Mock files are produced **outside the dev loop** (Claude Desktop, Figma, v0, hand-drawn screenshots, etc.) and consumed by QA for visual-fidelity comparison. Do not generate mocks from this agent.
+This section lists the mock files that exist for this CUJ. You (the pm agent) produce these mocks during the design conversation in `/design-feature` — they exist *before* this PRD file is written. See the "Mock Generation" section below for how.
 
 Convention: mock files live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` where:
 - `<prd-dir>` matches this PRD's mockups directory (e.g., `prd-001-mockups/`)
 - `<state>` describes the screen/state (e.g., `initial`, `after-click`, `error`, `empty`)
-- `<ext>` is `.html` (preferred for fidelity — rendered side-by-side by QA), `.png`/`.jpg`/`.webp` (compared as images), or `.md` (treated as additional textual acceptance criteria)
+- `<ext>` is `.html` (default — see Mock Generation), `.png`/`.jpg`/`.webp` (compared as images), or `.md` (treated as additional textual acceptance criteria)
 
-List the mocks that exist (or are planned) for this CUJ:
+Mocks for this CUJ:
 - `docs/ux/<prd-dir>/cuj-<id>-initial.html` — initial state
 - `docs/ux/<prd-dir>/cuj-<id>-after-action.html` — state after primary action
 - ...
@@ -444,8 +441,7 @@ Concrete, testable statements that define what "done" means for this CUJ. Each m
 - **Specify defaults**: What are the initial values? What happens on first launch? What does an empty state look like?
 - **Specify boundaries**: Max lengths, character limits, truncation behavior, pagination thresholds.
 - **Specify error recovery**: Not just "show an error" — what error, what can the user do about it, does the system retry?
-- **Mocks support the spec, they don't replace it**: even when mocks exist, every Journey Step must be described in prose (action, system response, "user sees"). Mocks are for visual fidelity, not for compensating for vague text.
-- **`[needs-mocks]` is a signal, not a blocker**: marking a CUJ with `[needs-mocks]` does not stop implementation or QA — the loop proceeds, QA records `NO_MOCK` for visual fidelity, and you draw mocks (e.g., in Claude Desktop) before the next iteration if you want fidelity checking.
+- **Mocks support the spec, they don't replace it**: even with mocks, every Journey Step must be described in prose (action, system response, "user sees"). Mocks lock visual fidelity; prose locks behavior.
 
 ### CUJ Dependencies
 
@@ -460,6 +456,69 @@ Example:
 - CUJ-2 (prd-000): Organize documents into folders → depends on CUJ-1
 - CUJ-3 (prd-001): Share a document → depends on CUJ-1
 - CUJ-4 (prd-001): Share a folder → depends on CUJ-2 and CUJ-3
+
+## Mock Generation
+
+As the pm agent, you also produce visual mocks for the CUJs you design. Mocks are produced **during the design conversation** in `/design-feature` Phase 0.5 — alongside CUJ shape iteration — so the spec and the visual are in feedback with each other from the start. There is no async handoff to an external designer.
+
+### Why HTML by default
+
+HTML is the right primary format because:
+- **It's text.** You produce text natively. Image generation requires calling a separate model (DALL-E, Imagen, etc.), which adds latency and removes precision — you can't reliably control exact button placement, copy strings, colors, or layout via a generation prompt.
+- **It's iterable.** When the user says "move the button right 40px," you change `pl-4` to `pl-12` — one line edit, save, refresh. Image regeneration starts the layout over from scratch.
+- **It's controllable.** Tailwind classes render the same bytes every time. Image gen is probabilistic.
+- **It renders for free.** The user opens the file in their browser via `open <path>` (or refreshes an existing tab). No special tooling needed.
+
+### When other formats fit
+
+- **`.png` / `.jpg` / `.webp`** — external designs (Figma export, designer's screenshot, image gen for stylized content), photographic or illustrative content beyond CSS reach, final stakeholder comps. Higher visual fidelity, much lower iterability.
+- **`.svg`** — icons, simple vector layouts.
+- **`.md`** — text-only specs (CLI output examples, API response shapes, accessibility annotations) where "visual fidelity" is really text fidelity.
+
+Default to HTML during design. Reach for other formats only when the user explicitly asks or when HTML genuinely can't represent the content.
+
+### File naming and location
+
+**`docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>`** — strict naming. IDs and states are what QA's visual-fidelity comparison globs against. Examples:
+- `docs/ux/prd-001-mockups/cuj-1-initial.html`
+- `docs/ux/prd-001-mockups/cuj-1-after-save.html`
+- `docs/ux/prd-001-mockups/cuj-3-empty.html`
+- `docs/ux/prd-001-mockups/cuj-3-filtered-no-results.html`
+
+Always create the mockups directory if it doesn't exist (`mkdir -p docs/ux/<prd-dir>`).
+
+### HTML mock format
+
+Self-contained HTML, Tailwind via CDN preferred (no build step), no JS unless interactivity itself is what's being mocked. Mocks must be **full UI mocks** — every mock includes the actual screen chrome (header, navigation, primary actions, content area, state-specific elements). If you find yourself drawing only gradients or abstract shapes, stop — you're missing the foreground UI.
+
+### Iteration discipline — this is a conversation, not a batch job
+
+For each mock:
+
+1. **Produce ONE mock per turn.** Don't bulk-produce multiple files even if the CUJ has many states.
+2. **Save it to disk first**, then **include the absolute file path in your response** so the user can open it. Example: `Saved cuj-1-initial.html — open it: /absolute/path/to/docs/ux/prd-000-articles-mockups/cuj-1-initial.html`. Don't make the user hunt for the path.
+3. **Actively describe what you drew.** What structural choices did you make? Where did you follow the spec literally vs interpret? What tradeoffs?
+4. **Ask an open question for feedback.** Not closed multiple-choice — let the user say anything. Examples: "What feels off?" "Does this match what you had in mind?"
+5. **Wait** for the user's response before producing another mock or advancing.
+6. **Don't advance to the next state until the user explicitly says to move on.**
+
+After the first mock for a CUJ is locked, **proactively propose additional variants** the spec didn't explicitly call for but a real designer would consider — empty state, error state, loading state, long-content overflow, short-content edge, multi-selection, the unhappy path. Ask the user which to mock. Don't just produce the one state the CUJ named — design comprehensively.
+
+### Representational elements (maps, charts, photos, illustrations)
+
+When the spec calls for a representational element you can't trivially produce in HTML/CSS, choose ONE:
+
+- **Find a real asset.** WebSearch for free/CDN-hosted resources (free SVG world maps, public-domain images, etc.) or check `docs/ux/assets/` for pre-staged files. Use it; cite the source.
+- **Draw it recognizably.** Child's-drawing level is fine — for a world map, rough continent shapes that still read as continents. Test: a viewer must be able to identify what your shapes represent without explanation.
+- **Use a labeled placeholder.** Visible text in the mock, e.g. `[Map placeholder — dark-theme world map, full viewport]`. Then ask the user to provide an asset or confirm the placeholder is acceptable.
+
+Never ship an ambiguous abstract shape (random blobs, gradients, dots) for a representational element. If you're between "draw it" and "placeholder," prefer the placeholder — a clearly-labeled stub is more honest than an ambiguous attempt.
+
+When you present the mock, note which approach you used for each representational element.
+
+### Visual defaults
+
+Clean, modern, neutral palette. Generous whitespace. 14–16px body text. System font stack. Override only when the user explicitly specifies otherwise (dark theme, brand color, playful direction, etc.).
 
 ## Process
 
@@ -488,16 +547,22 @@ When designing or evaluating features:
 - **Industry trends**: Look at where the industry is heading. Identify opportunities to differentiate.
 - **Feasibility check**: Cross-reference with the current architecture and tech stack. Flag features that would require significant infrastructure changes.
 
-### 4. Design features through CUJs
+### 4. Design features through CUJs — spec and mock together
 
 When proposing features or improvements:
 1. State the **problem** or **opportunity** clearly
 2. Provide **evidence** (market data, user insight, competitor analysis)
-3. **Draft CUJs** — write out the full user journeys with all the detail specified above
-4. Identify **CUJ dependencies** — how do these journeys relate to existing ones?
-5. Identify **risks** and **trade-offs**
-6. Ask the user for input and **iterate on the CUJs together** — drill into details, challenge assumptions, refine steps
-7. Only after alignment, write the finalized CUJs to the PRD files
+3. **Draft a CUJ shape** — title plus a paragraph-level flow description
+4. **Iterate on the shape** with the user
+5. Once the shape is agreed, **produce the first mock** for the CUJ's primary state — save to `docs/ux/<prd-dir>/cuj-<id>-initial.html`, **include the absolute file path in your response** so the user can open it
+6. User reviews the mock, gives feedback ("button on the right," "this should be a list not cards," etc.). **Iterate on the mock AND the shape together** — visual feedback often surfaces spec gaps. Update both in lockstep.
+7. Once the primary mock is locked, **proactively propose additional variants** the spec didn't explicitly call for but a real designer would consider: empty state, error state, loading state, long-content overflow, short-content edge, multi-selection, the unhappy path. Ask the user which to draw.
+8. Iterate each variant with the user.
+9. Identify **CUJ dependencies** and **risks/trade-offs**.
+10. Move to the next CUJ; repeat 3–9.
+11. After all CUJs are aligned, write the finalized CUJs to the PRD files, referencing the mocks that already exist.
+
+The work product of this step is **both** the agreed CUJ set AND the mock files saved under `docs/ux/<prd-dir>/`. The PRD writing in Step 5 is mechanical — it documents what's already designed.
 
 ### 5. Update PRD documents
 
@@ -613,6 +678,11 @@ Ordered list of what should be planned next, with rationale. The planner reads t
 - **Don't toggle progress state in PRDs** — PRDs are spec, not progress trackers. Per-CUJ done-ness lives in `docs/qa-report.md` (engineering) and `docs/pm-review.md` (product). PRD-level `status:` frontmatter is the only PRD edit you make during review.
 - Don't skip edge cases and error states — these are where products break in practice
 - Don't write CUJs with missing sections — every field in the template exists for a reason
+- **Don't write implementation code** — your job is design (spec + mocks). Implementation is for the parallel worktree agents in `/dev-cycle`.
+- **Don't bulk-produce mocks.** One mock per turn, present it with the file path, ask for feedback, wait. Bulk-producing prevents iteration — exactly the rigidity that motivated merging the PM and UX roles in the first place.
+- **Don't skip the file path in your mock response.** Every saved mock must be accompanied by the absolute file path so the user can `open` it without hunting. Don't say "saved!" without naming the path.
+- **Don't default to image mocks (PNG/JPG) when HTML would work.** HTML iterates; images don't. Use images only for content HTML can't represent (real photos, imported designs, illustrations beyond CSS reach).
+- **Don't ship abstract shapes for representational elements** — see the "Representational elements" rule in Mock Generation. Use a labeled placeholder if you can't draw it recognizably.
 ````
 
 ---
@@ -2216,7 +2286,7 @@ Return to the orchestrator with: a one-paragraph session summary, the list of is
 
 `````markdown
 ---
-description: Design a product feature — drive a conversational product-design discovery with the user, route to the right outcome (new PRD, extend existing PRD, refine existing PRD, or bootstrap a brand-new project), collaboratively shape CUJs, then hand the agreed design to the pm agent for writing. Also writes/updates MOCK_BRIEF.md for the external designer and seeds/extends docs/status.md.
+description: Design a product feature — drive a conversational product-design discovery with the user, route to the right outcome (new PRD, extend existing PRD, refine existing PRD, or bootstrap a brand-new project), collaboratively shape CUJs AND produce HTML mocks in lockstep, then hand the agreed design to the pm subagent to write the PRD. Mocks are produced during the design conversation (no external designer / no MOCK_BRIEF handoff). Seeds/extends docs/status.md.
 ---
 
 # design-feature — Design a product feature
@@ -2225,19 +2295,18 @@ You are the orchestrator and product designer. **You** drive the design conversa
 
 The skill handles four routes — the orchestrator decides which during Phase 0:
 
-- **Route A — Bootstrap brand-new project**: no `docs/prd/index.md` exists yet. Discovery is full (all six dimensions including vision, persona, form factor). PM writes the first PRD + bootstraps the index. Phase 2 (designer-rules README seed) runs.
-- **Route B — New PRD in an existing project**: a separate feature that doesn't fit any existing PRD's scope. Discovery focuses on what's specific to the new feature; foundational dimensions are skimmed since prior PRDs already established them. PM writes a new `prd-NNN-<slug>.md`.
-- **Route C — Extend an existing PRD with new CUJs**: the user's pitch is additional behavior within an existing feature's scope. PM appends new CUJ sections to the existing PRD and appends matching blocks to the existing `MOCK_BRIEF.md`.
-- **Route D — Refine existing CUJs in an existing PRD**: the user wants to change the spec of CUJs that already exist (implementation revealed the spec was wrong, user feedback, etc.). PM modifies the relevant CUJ sections in place; existing mocks for affected CUJs may become stale and need redrawing — the orchestrator surfaces this for confirmation.
+- **Route A — Bootstrap brand-new project**: no `docs/prd/index.md` exists yet. Discovery is full (all six dimensions including vision, persona, form factor). PM writes the first PRD + bootstraps the index.
+- **Route B — New PRD in an existing project**: a separate feature that doesn't fit any existing PRD's scope. Discovery focuses on what's specific to the new feature; foundational dimensions are skimmed. PM writes a new `prd-NNN-<slug>.md`.
+- **Route C — Extend an existing PRD with new CUJs**: the user's pitch is additional behavior within an existing feature's scope. PM appends new CUJ sections to the existing PRD.
+- **Route D — Refine existing CUJs in an existing PRD**: the user wants to change the spec of CUJs that already exist. PM modifies the relevant CUJ sections in place (preserving CUJ-IDs); the orchestrator overwrites the affected mock files during Phase 0.5.
 
 The flow:
 
 - **Phase 0** — Discovery: free-form conversational product design + explicit routing decision (no `AskUserQuestion`, no subagents). Probe problem/user, value, journeys, scope, form factor, edge cases. React to answers, mirror back, surface tensions. End by proposing a route (A/B/C/D) and getting user confirmation.
-- **Phase 0.5** — CUJ shape drafting: propose each CUJ's shape (title + flow paragraph) one at a time, iterate, get explicit confirmation on the set. For Route D, the "shape" is the *revised* shape of the existing CUJ — explicitly call out what changed.
-- **Phase 1** — PM subagent executes the route: bootstrap / write / extend / refine. No re-discovery.
-- **Phase 2** — Seed `docs/ux/README.md` (Route A only — every other route already has it).
-- **Phase 2.5** — Status update: append new CUJ rows (A, B, C) or reset affected rows' Impl/QA/PM columns (D).
-- **Phase 3** — Hand off to the user with truthful description of what was written/extended/refined, including any stale mocks the user needs to redraw.
+- **Phase 0.5** — Shape + mocks: per CUJ, propose the shape, agree on it, draw the first mock and iterate visual + shape together, propose additional variants and draw each. The orchestrator (acting as pm) follows the mock-generation rules in `pm.md`. Mocks are real HTML files saved under `docs/ux/<prd-dir>/` and the file path is included in every response for the user to `open`.
+- **Phase 1** — PM subagent executes the route: bootstrap / write / extend / refine PRD files, referencing the mocks that already exist from Phase 0.5. No re-discovery, no mock generation here (already done).
+- **Phase 2** — Status update: append new CUJ rows (A, B, C) or reset affected rows' Impl/QA/PM columns (D).
+- **Phase 3** — Hand off to the user with a truthful summary of what was written, extended, or refined.
 
 ## Phase 0: Discovery — conversational product design + routing
 
@@ -2302,45 +2371,58 @@ When you reach that bar, say: "I think I have enough to sketch CUJ shapes — le
 
 ---
 
-## Phase 0.5: CUJ shape drafting — iterative
+## Phase 0.5: CUJ shape + mocks — iterative, per CUJ
 
-Before invoking the `pm` subagent for full formatting, draft the **shape** of each CUJ collaboratively with the user. Still no file writes.
+This is where spec and visual come together. For each CUJ, you (still acting as the pm role in the main thread) iterate the **shape** and the **mocks** with the user in lockstep — propose shape, agree on it, draw the first mock, iterate visual + shape together, propose additional variants. The pm subagent in Phase 1 inherits both: the agreed shapes AND the saved mock files.
+
+This phase is conversational and produces real artifacts (mock files saved to disk). For mock generation rules — file format choice, HTML defaults, iteration discipline, representational elements, visual defaults — **follow the "Mock Generation" section of `pm.md`** verbatim. The agent's rules live there; this skill orchestrates the loop.
 
 For each CUJ, one at a time:
 
 1. **Propose the shape**: title + a one-paragraph description of what happens at a journey level. No full template formatting yet, no acceptance criteria — just the flow in plain prose.
    - **Routes A, B, C** (new CUJs): propose net-new shapes.
-   - **Route D** (refining existing CUJs): present the *current* CUJ's shape, then the *revised* shape, with a clear "what changed and why" note. Reference the existing CUJ-ID — you're modifying it, not creating a new one.
-2. **Ask**: "Is this the right shape? What's missing, wrong, or unclear?"
-3. **Iterate** until the user confirms. Capture any specifics they add — copy strings, edge cases, defaults, visual notes — into your working memory; you'll pass these to the PM subagent.
+   - **Route D** (refining existing CUJs): present the *current* CUJ's shape, then the *revised* shape with a clear "what changed and why" note. Reference the existing CUJ-ID — you're modifying it, not creating a new one.
 
-Once all 3-6 shapes are confirmed, **summarize the set** before moving on:
+2. **Iterate on the shape** until the user agrees.
 
-> Here's the CUJ set we're going to write:
-> - CUJ-N: <title> — <one-line summary>   *(new, route X)*
-> - CUJ-M: <title> — <one-line summary>   *(refined, was: ...)*
+3. **Produce the first mock** for the CUJ's primary state. Save to `docs/ux/<prd-dir>/cuj-<id>-initial.html` (create the directory if needed). **Include the absolute file path in your response** so the user can `open` it. Briefly describe what you drew and what you decided / interpreted; ask an open question for feedback ("What feels off?" / "Does this match what you had in mind?"). Wait for their response.
+
+4. **Iterate on the mock AND the shape together.** Visual feedback often surfaces spec gaps ("if the title is 60 chars, where does it wrap?"). When that happens, update both — re-save the mock with the user-visible file path, and revise the shape in your working memory.
+
+5. **Once the primary state is locked, proactively propose additional variants** — empty state, error state, loading state, long-content overflow, multi-selection, the unhappy path. Don't just produce what the CUJ named — design comprehensively. Ask the user which variants to mock. Then for each agreed variant:
+   - Save to `docs/ux/<prd-dir>/cuj-<id>-<state>.html` (where `<state>` is `empty`, `error`, `loading`, etc.)
+   - Include the file path in your response
+   - Iterate to alignment
+
+6. **For Route D specifically (refining existing CUJs):** before drawing the revised mocks, list the existing mock files under `docs/ux/<prd-dir>/cuj-<id>-*.{html,png,jpg,webp,md}` and ask: "These mocks reflect the prior CUJ — I'll overwrite them with the revised mocks as we agree. OK?" Once confirmed, overwrite as you go. No "flagged for redraw" handoff — the redraw happens here.
+
+7. Move to the next CUJ. Repeat 1–6.
+
+Once all 3-6 CUJ shapes are confirmed AND their mocks are locked, **summarize the set** before moving on:
+
+> Here's the CUJ set we're going to write, with mocks saved at:
+> - CUJ-N: <title>   *(new, mocks: cuj-N-initial.html, cuj-N-empty.html)*
+> - CUJ-M: <title>   *(refined, was: ...; mocks: cuj-M-initial.html updated, cuj-M-error.html updated)*
 > - ...
 >
-> Ready for me to write?
+> Ready for me to write the PRD?
 
 Get an explicit "yes" before moving to Phase 1.
 
-**For Route D (refine) — also confirm mock invalidation before Phase 1.** Tell the user which existing mock files under `docs/ux/<prd-dir>/` correspond to each CUJ being refined (glob `cuj-<id>-*.{html,png,jpg,webp,md}`), and ask: "These mocks may no longer match the revised CUJ. Should I flag them for redraw in the handoff? (They won't be deleted automatically — the designer can review and replace.)"
-
 ---
 
-## Phase 1: Hand off to the `pm` subagent — route-specific writing
+## Phase 1: Hand off to the `pm` subagent — route-specific PRD writing
 
-The discovery and CUJ-shape iteration is **done** at this point. The PM subagent's job is narrow and route-specific: bootstrap (A), write new PRD (B), extend existing PRD (C), or refine CUJs in existing PRD (D). It must NOT redo discovery.
+The discovery, CUJ-shape iteration, AND mock generation are **done** at this point. The PM subagent's job is narrow and route-specific: bootstrap (A), write new PRD (B), extend existing PRD (C), or refine CUJs in existing PRD (D). It must NOT redo discovery, and it must NOT regenerate mocks — those already exist on disk from Phase 0.5.
 
-Spawn a `pm` subagent with the route + discovery summary + confirmed CUJ shapes embedded in the prompt. Substitute the bracketed sections with your actual collected content:
+Spawn a `pm` subagent with the route + discovery summary + confirmed CUJ shapes + list of mock files embedded in the prompt. Substitute the bracketed sections with your actual collected content:
 
 ```
-You are executing the writing phase for a product feature the user
-just designed with the orchestrator in Phases 0 and 0.5. Discovery
-is DONE — do not re-ask the user about the problem, value prop,
-scope, form factor, style, or what the CUJs should be. Your job is
-to write up what's already agreed, following the route below.
+You are executing the PRD-writing phase. Discovery is DONE — do not
+re-ask the user about the problem, value prop, scope, form factor,
+style, or what the CUJs should be. Mocks are ALREADY produced and
+saved on disk — do not regenerate them; reference them by path in
+the CUJ template's "Mocks / Reference Designs" section.
 
 ## Route: [A | B | C | D]
 
@@ -2350,11 +2432,11 @@ to write up what's already agreed, following the route below.
 - B → "New PRD in existing project. Add a new prd-NNN-<slug>.md
        alongside existing PRDs."
 - C → "Extend existing PRD <prd-NNN-<slug>>. Append new CUJ
-       sections to that PRD file and append matching blocks to its
-       existing MOCK_BRIEF.md."
+       sections to that PRD file. Mocks already saved."
 - D → "Refine existing CUJs in PRD <prd-NNN-<slug>>. The CUJs
        being refined are: CUJ-<X>, CUJ-<Y>. Modify them in place;
-       do NOT create new CUJ IDs."
+       do NOT create new CUJ IDs. Updated mocks already saved
+       (overwriting prior mock files for those CUJ-IDs)."
 ]
 
 ## Discovery summary
@@ -2367,13 +2449,17 @@ For C: which host PRD, why the new CUJs fit there, what scope/journey
 context they extend.
 For D: which CUJs, why they're being refined, what's changing.]
 
-## Confirmed CUJ shapes
+## Confirmed CUJ shapes + mock paths
 
-[Insert each confirmed CUJ shape from Phase 0.5 — title plus the
-paragraph-level flow. Include any specifics the user added: copy
-strings, edge cases, defaults, visual notes.
-For D: include both the OLD shape and the REVISED shape so PM knows
-what to change, with the CUJ-ID explicitly stated for each.]
+[For each CUJ:
+- The agreed shape (title + paragraph-level flow + any user-added
+  specifics: copy strings, edge cases, defaults).
+- The list of mock files already saved under docs/ux/<prd-dir>/ for
+  this CUJ (e.g., "cuj-1-initial.html, cuj-1-empty.html,
+  cuj-1-error.html").
+For Route D: include both the OLD shape and the REVISED shape with
+the CUJ-ID explicitly stated for each, plus the list of mock files
+that were overwritten.]
 
 ## Your responsibilities for THIS invocation
 
@@ -2383,36 +2469,30 @@ what to change, with the CUJ-ID explicitly stated for each.]
    user section, and an empty PRD listing — using the discovery
    summary above as the source.
 2. Expand confirmed CUJ shapes into the full CUJ template format
-   (see "format rules" below).
+   (see "format rules" below). The "Mocks / Reference Designs"
+   section of each CUJ lists the mock files already saved.
 3. Write `docs/prd/prd-000-<slug>.md` (start at 000 for the first PRD).
 4. Update `docs/prd/index.md` with this PRD's entry.
-5. Write `docs/ux/prd-000-<slug>-mockups/MOCK_BRIEF.md` per the
-   structure below.
 
 ### If Route B (new PRD in existing project):
 
 1. Compute NNN: read `docs/prd/index.md`, find the highest existing
    prd-NNN, increment.
-2. Expand confirmed CUJ shapes into the full CUJ template format.
+2. Expand confirmed CUJ shapes into the full CUJ template format,
+   referencing the saved mocks by path.
 3. Write `docs/prd/prd-NNN-<slug>.md`.
 4. Update `docs/prd/index.md` with the new entry.
-5. Write `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md` per the
-   structure below.
 
 ### If Route C (extend existing PRD):
 
 1. Read the host PRD file `docs/prd/<host-prd-file>` to determine
    the next available CUJ-ID (highest existing CUJ-ID in this PRD,
    incremented — IDs are unique per PRD).
-2. Expand each confirmed CUJ shape into the full CUJ template format.
+2. Expand each confirmed CUJ shape into the full CUJ template format,
+   referencing the saved mocks by path.
 3. **Append** the new CUJ sections to the existing PRD file. Do NOT
-   touch existing CUJs in the host PRD. Update the PRD's
-   `Last updated` frontmatter field if present.
-4. **Append** matching per-CUJ blocks to the host PRD's existing
-   `docs/ux/<host-prd-mockups-dir>/MOCK_BRIEF.md` under the
-   "Per-CUJ mocks needed" section. Use the same MOCK_BRIEF format
-   as the new-PRD case.
-5. `docs/prd/index.md` does NOT need an entry update — the host PRD
+   touch existing CUJs in the host PRD.
+4. `docs/prd/index.md` does NOT need an entry update — the host PRD
    is already listed.
 
 ### If Route D (refine existing CUJs):
@@ -2421,14 +2501,10 @@ what to change, with the CUJ-ID explicitly stated for each.]
 2. For each CUJ being refined (the orchestrator gave you the list of
    CUJ-IDs explicitly), replace its template content with the
    revised shape expanded into the full template format. Preserve
-   the CUJ-ID — do NOT create new IDs.
-3. **Update** the matching CUJ block in the host PRD's existing
-   `MOCK_BRIEF.md`, replacing the per-CUJ section for each affected
-   CUJ-ID. State in the MOCK_BRIEF that prior mocks for these CUJ-IDs
-   may be stale (the orchestrator decided whether to flag them for
-   redraw — see the "Stale mock policy" line in the discovery
-   summary).
-4. `docs/prd/index.md` does NOT need an entry update.
+   the CUJ-ID — do NOT create new IDs. Reference the updated mock
+   files (already overwritten on disk by the orchestrator in
+   Phase 0.5).
+3. `docs/prd/index.md` does NOT need an entry update.
 
 ### Format rules (apply to all routes):
 
@@ -2438,171 +2514,32 @@ what to change, with the CUJ-ID explicitly stated for each.]
   pass — the user already knows what they want.
 - **Full CUJ template** — exhaustive per CUJ (Context, Preconditions,
   Journey Steps with System Response / User Sees / Details, Edge
-  Cases & Error States, Mocks / Reference Designs with [needs-mocks]
-  flag, Acceptance Criteria as plain bullets — NOT checkboxes).
+  Cases & Error States, Mocks / Reference Designs listing the saved
+  files by path, Acceptance Criteria as plain bullets — NOT
+  checkboxes).
+- The "Mocks / Reference Designs" section lists ONLY mock files that
+  actually exist on disk for this CUJ. No `[needs-mocks]` flag —
+  that flag no longer exists. If a CUJ has no mocks (rare; means
+  the orchestrator skipped mock production in Phase 0.5), state
+  "No mocks for this CUJ" with a brief reason.
 - Use the confirmed CUJ shape's paragraph as the basis for Journey
   Steps. Do NOT invent CUJs that aren't in the agreed shape set.
 - If a shape leaves something genuinely ambiguous, make a defensible
   choice and flag it inline with `(assumption — confirm)`.
 
-### MOCK_BRIEF.md structure (used by Routes A and B for new files; Routes C and D append/modify per-CUJ blocks inside the existing file):
-
-   ```markdown
-   # Mock Brief — <Project Name>
-
-   > Source PRD: docs/prd/prd-NNN-<slug>.md
-   > Mock target dir: docs/ux/prd-NNN-<slug>-mockups/
-
-   ## Product Context
-   <2-3 sentences — enough that the designer in Claude Desktop
-   understands what they're drawing without reading the PRD.>
-
-   ## Visual Constraints
-   - **Form factor**: <from brief, e.g. "web desktop, ~1200px viewport"
-     or "mobile web, ~390px viewport">
-   - **Style**: <from brief, or "clean, modern, neutral palette,
-     generous whitespace, system font stack" as default>
-   - **Tech**: HTML + Tailwind via CDN preferred. No JS unless
-     interactivity itself is what's being mocked.
-
-   ## File naming convention
-   `cuj-<id>-<state>.html`
-   - Examples: `cuj-1-initial.html`, `cuj-1-after-save.html`,
-     `cuj-3-empty.html`, `cuj-3-filtered-no-results.html`
-
-   ## Per-CUJ mocks needed
-
-   ### CUJ-1: <CUJ title>
-
-   **One-line summary**: <what the user does in this journey>
-
-   **States to mock**:
-   - `cuj-1-initial.html` — <what's on screen before user interacts>
-   - `cuj-1-<state>.html` — <next state>
-   - ...
-
-   **Key copy strings** (use verbatim):
-   - <Label/title/CTA/empty-state copy from the CUJ spec>
-
-   **Visual notes**: <anything special — e.g. "use a soft red badge
-   for the unread count"; or "—" if nothing specific>
-
-   (Repeat the above block for every CUJ in the PRD.)
-
-   ---
-
-   ## How to use this brief
-
-   In a chat agent with filesystem access to this repo (e.g., Claude
-   Desktop), send a prompt like:
-
-   > Please produce mocks for this PRD. First read
-   > `docs/ux/README.md` for your designer rules, then read this brief
-   > at `docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md`. Produce one
-   > HTML at a time per the rules and save each into
-   > `docs/ux/prd-NNN-<slug>-mockups/`.
-
-   The README contains the iteration discipline (one HTML at a time,
-   ask "polish/next/revise" after each). The agent will read both
-   files directly — no need to paste contents.
-   ```
-
-   Fill in every <placeholder> with the actual content from the PRD
-   you just wrote. Do not leave any placeholder text in the final file.
-
-Return: a structured summary with three fields so the orchestrator can
-build the handoff message:
+Return: a structured summary with these fields so the orchestrator
+can build the handoff message:
   - `route`: A | B | C | D (echo what you executed)
   - `files_created`: list of absolute paths created
-  - `files_modified`: list of absolute paths modified (PRDs extended/
-    refined, MOCK_BRIEF.md appended/updated, index.md updated)
+  - `files_modified`: list of absolute paths modified
   - `cuj_set`: list of "CUJ-<ID>: <title> (new | refined-was-<old-title>)"
 ```
 
 If `pm` reports a blocker (missing context, contradictory brief, etc.), surface it to the user and stop.
 
-## Phase 2: Seed `docs/ux/README.md` (Route A only)
+---
 
-This phase runs **only on Route A** (brand-new project). Routes B, C, D skip this entirely — `docs/ux/README.md` already exists from an earlier run.
-
-If `docs/ux/README.md` does **not** exist, write it now. This file is the **operating rules** for the designer agent — whichever agent (typically Claude Desktop with filesystem access) is producing mocks reads this directly.
-
-Write the following content verbatim:
-
-````markdown
-# UX Mocks — designer rules
-
-This directory holds visual mocks for each PRD's CUJs. Mocks are produced **outside the code-side dev loop** (typically in Claude Desktop, or any chat agent with filesystem access to this repo) and consumed by QA for visual-fidelity checking.
-
-If you are an agent asked to produce mocks for this repo, **read this file first** — it is your operating spec. Then read the relevant `MOCK_BRIEF.md` for the specific PRD.
-
-## Folder layout
-
-```
-docs/ux/
-├── README.md                              ← you are here
-├── prd-NNN-<slug>-mockups/
-│   ├── MOCK_BRIEF.md                      ← per-PRD spec, written/updated by /design-feature
-│   ├── cuj-1-initial.html
-│   ├── cuj-1-after-action.html
-│   ├── cuj-2-empty.html
-│   └── ...
-└── ...
-```
-
-QA discovers mocks by globbing `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}` — no registration anywhere is needed.
-
-## Designer rules (operating spec)
-
-You are a UX designer producing visual mocks for a developer workflow. Follow these rules strictly.
-
-### File format
-
-Produce a mock file per the brief. **HTML is the default** — it is renderable, editable in chat (you can revise inline), and QA can render it side-by-side with the implementation via Playwright.
-
-Use other formats when they fit better:
-- **`.png` / `.jpg` / `.webp`** — visual designs from external tools (Figma export, image gen, hand-drawn screenshot). Higher visual fidelity, lower iterability.
-- **`.svg`** — icons or simple vector layouts.
-- **`.md`** — text-only specs (CLI output, API response shapes, accessibility annotations) where "visual fidelity" is really text fidelity.
-
-File naming: **`cuj-<id>-<state>.<ext>`** exactly — IDs and states come from the MOCK_BRIEF. Save each file to its target path under `docs/ux/<prd-dir>/`.
-
-For **HTML** mocks specifically: self-contained, Tailwind via CDN is fine, no JS unless interactivity itself is what's being mocked. Mocks must be **full UI mocks**, not abstract background art — every mock includes the actual screen chrome (header, primary actions, content area, state-specific elements named in the brief). If you find yourself drawing only gradients/blobs, stop — you're missing the foreground UI.
-
-### Iteration discipline — this is a conversation, not a batch job
-
-This is the most important rule.
-
-For each mock, in order:
-1. **Produce ONE mock per response.** Do not bulk-produce, even if the brief lists many states.
-2. **Actively present what you drew.** Show the rendered preview. Explain the structural choices, where you followed the brief literally vs. interpreted, any tradeoffs you made.
-3. **Ask an open question for feedback** — e.g., "What feels off?" or "Does this match what you had in mind?" Do not use a closed multiple-choice template; the user may want something a template doesn't cover.
-4. **Wait** for the user's response before producing anything else.
-5. Do not advance to the next CUJ state until the user explicitly says to move on.
-
-### Representational elements (maps, charts, photos, illustrations)
-
-When the brief calls for a representational element you can't trivially produce inline, fulfill the request by ONE of:
-
-- **Find a real asset.** WebSearch for free/CDN-hosted resources (free SVG world maps, public-domain images, etc.) or check `docs/ux/assets/` for pre-staged files. Use it and cite the source.
-- **Draw it recognizably.** A child's-drawing level is fine — for a world map, rough continent shapes that still read as continents. The test: a viewer must be able to identify what your shapes represent without explanation.
-- **Use a labeled placeholder.** Visible text in the mock, e.g. `[Map placeholder — dark-theme world map, full viewport]`. Then ask the user to provide an asset or confirm the placeholder is acceptable.
-
-Never ship an ambiguous abstract shape (random blobs, gradients, dots) for a representational element. If you're between "draw it" and "placeholder," prefer the placeholder — a clearly-labeled stub is more honest than an ambiguous attempt.
-
-When you present the mock, note which approach you used for each representational element so the user knows what's real, what's sketched, what's stubbed.
-
-### Visual defaults
-
-Clean, modern, neutral palette. Generous whitespace. 14–16px body text. System font stack. Override only when the MOCK_BRIEF explicitly specifies otherwise (e.g., dark theme, brand color).
-
-### Verifying the brief before drawing
-
-- If the MOCK_BRIEF is missing a state, copy string, or visual constraint you need, ASK before drawing. Do not invent.
-- If the brief contradicts the PRD it points to, ASK which is authoritative.
-````
-
-## Phase 2.5: Update `docs/status.md` — route-aware
+## Phase 2: Update `docs/status.md` — route-aware
 
 `docs/status.md` is the canonical per-CUJ progress doc. It must exist from day 0 so the user (and the loop's agents) always have one place to answer "where are we?". This phase runs after Phase 1, and its behavior depends on the route.
 
@@ -2637,7 +2574,7 @@ After it returns, verify the status table reflects the route's intent.
 
 ## Phase 3: Final handoff to the user — route-specific summary
 
-Print a single concise summary that truthfully reflects what was written, extended, refined, or reset. Use the `route` + `files_created` + `files_modified` + `cuj_set` returned by PM in Phase 1.
+Print a single concise summary that truthfully reflects what was written, extended, refined, or reset. Use the `route` + `files_created` + `files_modified` + `cuj_set` returned by PM in Phase 1, plus the mock paths from Phase 0.5.
 
 ### Route A (bootstrap brand-new project):
 
@@ -2646,94 +2583,62 @@ Project bootstrapped.
 
 PRD index:      docs/prd/index.md (created)
 PRD written:    docs/prd/prd-000-<slug>.md
-Mock brief:     docs/ux/prd-000-<slug>-mockups/MOCK_BRIEF.md
-Mockups dir:    docs/ux/prd-000-<slug>-mockups/
-Designer rules: docs/ux/README.md (created)
+Mocks written:  docs/ux/prd-000-<slug>-mockups/  (<count> files; see PRD's Mocks section per CUJ)
 Status seeded:  docs/status.md (CUJs added as `not started`)
 
-To produce mocks, open a chat agent with filesystem access to this
-repo and send:
-
-  Please produce mocks for this PRD. First read docs/ux/README.md
-  for your designer rules, then read docs/ux/prd-000-<slug>-mockups/
-  MOCK_BRIEF.md. Produce one HTML at a time per the rules and save
-  each into docs/ux/prd-000-<slug>-mockups/.
+Next: review the mocks in your browser if you haven't already. When ready,
+run /dev-cycle to start building.
 ```
 
 ### Route B (new PRD in existing project):
 
 ```
 PRD added: docs/prd/prd-NNN-<slug>.md
-Mock brief: docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md
-Mockups dir: docs/ux/prd-NNN-<slug>-mockups/
+Mocks written: docs/ux/prd-NNN-<slug>-mockups/  (<count> files)
 PRD index updated: docs/prd/index.md
 Status updated: <count> new CUJs appended as `not started`
 
-To produce mocks for this new feature, open a chat agent with
-filesystem access to this repo and send:
-
-  Please produce mocks for this PRD. First read docs/ux/README.md
-  for your designer rules, then read docs/ux/prd-NNN-<slug>-mockups/
-  MOCK_BRIEF.md. Produce one HTML at a time per the rules and save
-  each into docs/ux/prd-NNN-<slug>-mockups/.
+Next: run /dev-cycle to build this feature.
 ```
 
 ### Route C (extend existing PRD):
 
 ```
 PRD extended: docs/prd/<host-prd-file> (<count> new CUJs appended: <CUJ-IDs>)
-Mock brief extended: docs/ux/<host-prd-mockups-dir>/MOCK_BRIEF.md
-Mockups dir: docs/ux/<host-prd-mockups-dir>/  (existing — new mocks go here)
+Mocks added: docs/ux/<host-prd-mockups-dir>/  (<count> new files for CUJs <CUJ-IDs>)
 Status updated: <count> new CUJ rows appended as `not started`
 
-To produce mocks for the new CUJs, open a chat agent with filesystem
-access to this repo and send:
-
-  Please produce mocks for the new CUJs <CUJ-IDs> added to this PRD.
-  First read docs/ux/README.md for your designer rules, then read the
-  updated brief at docs/ux/<host-prd-mockups-dir>/MOCK_BRIEF.md (focus
-  on the per-CUJ blocks for <CUJ-IDs>). Produce one HTML at a time per
-  the rules and save each into docs/ux/<host-prd-mockups-dir>/.
+Next: run /dev-cycle to build the new CUJs.
 ```
 
 ### Route D (refine existing CUJs):
 
 ```
 PRD refined: docs/prd/<host-prd-file> (<count> CUJs revised: <CUJ-IDs>)
-Mock brief updated: docs/ux/<host-prd-mockups-dir>/MOCK_BRIEF.md (per-CUJ blocks for <CUJ-IDs> rewritten)
+Mocks overwritten: docs/ux/<host-prd-mockups-dir>/  (<count> updated files for CUJs <CUJ-IDs>)
 Status reset: <count> CUJ rows reset to Impl=`not started`, QA=`—`, PM=`—`
 
-Existing mocks possibly stale (flagged in MOCK_BRIEF, not auto-deleted):
-  - docs/ux/<host-prd-mockups-dir>/cuj-<X>-*.html
-  - docs/ux/<host-prd-mockups-dir>/cuj-<Y>-*.html
-  ...
-
-To redraw the affected mocks, open a chat agent with filesystem
-access to this repo and send:
-
-  Please review and redraw the mocks for CUJs <CUJ-IDs> in this PRD.
-  First read docs/ux/README.md for your designer rules, then read the
-  updated brief at docs/ux/<host-prd-mockups-dir>/MOCK_BRIEF.md. The
-  per-CUJ blocks for <CUJ-IDs> reflect the revised spec — compare
-  the existing cuj-<id>-*.html files against the new spec and produce
-  replacements where the prior mocks no longer match. Save each into
-  docs/ux/<host-prd-mockups-dir>/.
+Next: run /dev-cycle. QA will re-walk these CUJs against the revised spec and mocks.
 ```
 
-Substitute every `<placeholder>` with the actual content from PM's return. Do not editorialize — the user has everything they need.
+Substitute every `<placeholder>` with the actual content from PM's return + the orchestrator's Phase 0.5 records. Do not editorialize — the user has everything they need.
 
 ## What NOT to do
 
-- **Don't rush Phase 0.** The point of moving discovery out of the PM subagent and into the main thread is that you can have a real, multi-turn product design conversation. If you ask 2 questions and start drafting CUJs, you've failed the user. Stay in discovery until you can describe the user, problem, value prop, scope, and journey set *in your own words* — not just parrot back what the user said.
+- **Don't rush Phase 0.** Discovery in the main thread exists so you can have a real, multi-turn product design conversation. If you ask 2 questions and start drafting CUJs, you've failed the user. Stay in discovery until you can describe the user, problem, value prop, scope, and journey set *in your own words* — not just parrot back what the user said.
 - **Don't use `AskUserQuestion` during Phase 0 discovery.** Free-form text dialogue is the whole point. `AskUserQuestion` is fine for menu choices elsewhere; it's the wrong tool for design conversation.
-- **Don't draft CUJs in Phase 0.** Build the picture first. Phase 0.5 is where shapes land.
-- **Don't skip Phase 0.5.** Even if the user pitched concretely, propose the CUJ shapes one at a time and get explicit confirmation per shape before invoking the PM subagent. The PM subagent's job is mechanical writing — it can't re-design what wasn't designed first.
-- **Don't have the PM subagent re-do discovery.** Phase 1's prompt embeds the discovery summary and the confirmed shapes. PM expands shapes into full CUJ template format and writes files — it does NOT re-ask design questions.
-- **Don't write the PRD yourself in the orchestrator.** PM owns the CUJ template formatting and the file writes. You own the conversation, the shapes, and the handoff.
-- **Don't draw mocks** — the entire point of MOCK_BRIEF.md is to hand mock production off to Claude Desktop. Do not generate HTML mocks from this skill or from any agent in this repo.
-- **Don't overwrite an existing `docs/ux/README.md`** — only create it if missing. Routes B/C/D skip Phase 2 entirely.
-- **Don't auto-delete stale mocks on Route D.** Even when the user confirms in Phase 0.5 that prior mocks are likely stale, the orchestrator flags them in the Phase 3 handoff message — it does NOT delete files. The designer (and the user) make the call after seeing the revised brief.
+- **Don't draft CUJ shapes or mocks in Phase 0.** Build the picture first. Phase 0.5 is where shapes AND mocks land.
+- **Don't skip Phase 0.5's mock iteration.** Producing the spec without the visual is exactly the asynchronous-handoff failure mode this skill replaced. For every CUJ, the primary mock must be drawn, iterated, and locked before moving on.
+- **Don't bulk-produce mocks.** One mock per response. Save it; include the absolute file path; describe what you drew; ask for feedback; wait. Bulk = no iteration = the rigidity we eliminated.
+- **Don't forget to include the file path** in every mock-save response. The user shouldn't have to hunt for "where did you save it?" — give them a path they can `open` directly.
+- **Don't default to image mocks (PNG/JPG) when HTML would work.** HTML iterates; images don't. See `pm.md` Mock Generation section for when image formats actually fit.
+- **Don't have the PM subagent re-do discovery in Phase 1.** Phase 1's prompt embeds the discovery summary, the confirmed CUJ shapes, AND the mock file paths. PM writes the PRD referencing what already exists — no re-design, no re-mocking.
+- **Don't have the PM subagent regenerate mocks in Phase 1.** Mocks are already saved on disk from Phase 0.5. PM only references them by path in the CUJ template's "Mocks / Reference Designs" section.
+- **Don't include the `[needs-mocks]` flag in CUJs you write.** That flag no longer exists — mocks are produced inline during design, so every CUJ has its mocks at write time. (If a CUJ legitimately can't have mocks — e.g., a backend-only CUJ — state "No mocks for this CUJ" with a brief reason.)
+- **Don't reference `docs/ux/README.md`, `MOCK_BRIEF.md`, or "Claude Desktop" anywhere.** The async-handoff flow is gone. Mocks live in `docs/ux/<prd-dir>/cuj-*.{html,...}`; that's it.
+- **Don't write the PRD yourself in the orchestrator.** Phase 1 PM subagent owns the file writes. You own the conversation, the shapes, the mocks, and the handoff.
 - **Don't skip the routing decision in Phase 0.** A pitch that should extend an existing PRD must NOT become a new PRD just because writing a new file is mechanically simpler. Wrong routing fragments features across PRDs and confuses the planner downstream.
+- **For Route D: don't try to preserve old mocks alongside revised ones.** When the user confirms refinement and you redraw the affected mocks in Phase 0.5, you overwrite the prior files at the same paths. Mock-file paths are stable identifiers (`cuj-<id>-<state>.html`); the file content evolves.
 `````
 
 ---
@@ -2771,11 +2676,11 @@ Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `
 
 ## Mocks Check
 
-Mock production happens outside this loop (typically Claude Desktop with filesystem access to this repo) and is consumed by QA in Phase 4 for visual-fidelity comparison. Surface missing mocks now so the user can produce them before QA runs, rather than discovering `NO_MOCK` silently after the fact.
+Mocks are normally produced during `/design-feature` Phase 0.5 alongside CUJ shape iteration — every CUJ that exited `/design-feature` should already have at least one mock file under `docs/ux/<prd-dir>/`. This check surfaces any CUJ that's missing mocks (typically: backfilled PRDs from `/organize-project` that didn't go through `/design-feature`, or CUJs added by manual `/user:pm` invocation without the conversational mock flow).
 
 1. Identify in-scope CUJs:
-   - **Scoped mode**: `[ ]` CUJs in the target PRD
-   - **Unscoped mode**: `[ ]` CUJs across all active PRDs
+   - **Scoped mode**: CUJs in the target PRD
+   - **Unscoped mode**: CUJs across all active PRDs
 
 2. For each in-scope CUJ, glob `docs/ux/**/cuj-<id>-*.{html,png,jpg,webp,md}`.
 
@@ -2783,19 +2688,17 @@ Mock production happens outside this loop (typically Claude Desktop with filesys
 
 4. Otherwise, list the CUJs missing mocks and use `AskUserQuestion` to ask the user to choose:
    - **Proceed without fidelity check** — QA will log `NO_MOCK` for these CUJs and skip visual comparison; functional verification still runs.
-   - **Pause** — stop the cycle here so mocks can be produced externally.
+   - **Pause** — stop the cycle here so mocks can be produced via `/design-feature` Route D (refine the affected CUJs to add mocks).
 
-   Include the Claude Desktop handoff prompt verbatim so the user can paste it immediately:
+   The handoff is just the slash-command invocation:
 
    ```
-   Please produce mocks. First read docs/ux/README.md for your designer
-   rules, then read docs/ux/<prd-dir>/MOCK_BRIEF.md. Produce one HTML at
-   a time per the rules and save each into docs/ux/<prd-dir>/.
+   /design-feature
    ```
 
-   Substitute `<prd-dir>` with the actual mockups directory for the affected PRDs (one prompt per PRD if multiple are affected).
+   Then describe to the orchestrator that you want to add mocks for CUJ-<X>, CUJ-<Y> in prd-NNN-<slug> (Route D — refine). The orchestrator will walk through each CUJ's shape (confirming it matches what's already specified), produce the mocks, and save them under `docs/ux/<prd-dir>/`.
 
-5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after producing mocks.
+5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after running `/design-feature` to add the mocks.
 
 ---
 
@@ -3714,11 +3617,11 @@ Don't editorialize. Don't recommend re-running — the user knows their cadence.
 ---
 ## 16. Command: Organize Project (`~/.claude/commands/organize-project.md`)
 
-One-time-per-project skill that retrofits an existing project into the canonical multi-agent pattern. Audits scattered docs broadly (not just canonical paths) and classifies them by content (PRD-like, design-like, etc.). Reconciles each non-canonical doc with the user (migrate / adopt / preserve / ignore). Scaffolds missing infrastructure (`scripts/qa-server.sh`, `docs/ux/README.md`, `.gitignore` lines). Spawns `tl` to derive design docs from the existing code (incorporating any adopted design content). Spawns `pm` sequentially per PRD to backfill CUJs that describe **what is built** — not what was originally specified, because there was no spec. Seeds `docs/status.md` with all CUJs at Impl=`merged`, QA=`—`, PM=`—`. **Idempotent** — checks for existing canonical state before writing; safe to re-run.
+One-time-per-project skill that retrofits an existing project into the canonical multi-agent pattern. Audits scattered docs broadly (not just canonical paths) and classifies them by content (PRD-like, design-like, etc.). Reconciles each non-canonical doc with the user (migrate / adopt / preserve / ignore). Scaffolds missing infrastructure (`scripts/qa-server.sh`, `.gitignore` lines). Spawns `tl` to derive design docs from the existing code (incorporating any adopted design content). Spawns `pm` sequentially per PRD to backfill CUJs that describe **what is built** — not what was originally specified, because there was no spec. Mocks are not auto-generated; the user runs `/design-feature` Route D later for any CUJ where visual fidelity matters. Seeds `docs/status.md` with all CUJs at Impl=`merged`, QA=`—`, PM=`—`. **Idempotent** — checks for existing canonical state before writing; safe to re-run.
 
 ````markdown
 ---
-description: Bring an existing project (built without this multi-agent setup) into conformance with the patterns expected by /dev-cycle, /design-feature, and the rest. Audits scattered docs broadly (not just canonical paths), reconciles them per user choice (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (scripts/qa-server.sh, .gitignore, docs/ux/README.md), derives design docs from code via the tl agent, backfills PRDs that describe what's actually built via the pm agent, and seeds docs/status.md. Idempotent — safe to re-run; preserves anything already at canonical paths.
+description: Bring an existing project (built without this multi-agent setup) into conformance with the patterns expected by /dev-cycle, /design-feature, and the rest. Audits scattered docs broadly (not just canonical paths), reconciles them per user choice (migrate / adopt / preserve / ignore), scaffolds missing infrastructure (scripts/qa-server.sh, .gitignore), derives design docs from code via the tl agent, backfills PRDs that describe what's actually built via the pm agent (mocks are NOT auto-generated — user runs /design-feature Route D later to add mocks where they want visual fidelity), and seeds docs/status.md. Idempotent — safe to re-run; preserves anything already at canonical paths.
 ---
 
 # organize-project — Bring an existing project into the multi-agent pattern
@@ -3732,10 +3635,10 @@ The flow:
 - **Phase 0** — Audit broadly: catalog all markdown files anywhere in the project, classify by content and filename heuristics (PRD-like, design-like, README, status, other).
 - **Phase 1** — Confirm product context conversationally: target user, primary problem, value prop, MVP scope.
 - **Phase 1.5** — Reconcile existing docs: per-document user decision (migrate / adopt / preserve / ignore).
-- **Phase 2** — Bootstrap infrastructure mechanically: `mkdir -p` canonical dirs, write `docs/ux/README.md`, create `scripts/qa-server.sh`, update `.gitignore`.
+- **Phase 2** — Bootstrap infrastructure mechanically: `mkdir -p` canonical dirs, create `scripts/qa-server.sh`, update `.gitignore`.
 - **Phase 3** — Derive design docs via the `tl` agent: read existing code + adopted/migrated design content, write `docs/design/system.md` + per-component `design-<slug>.md`.
 - **Phase 4** — Propose feature → PRD mapping conversationally: group detected features into proposed PRDs, get user confirmation. Skip features already covered by existing canonical PRDs.
-- **Phase 5** — Backfill PRDs via the `pm` agent (one invocation per PRD, sequential): read the relevant code + adopted/migrated PRD-like content, generate CUJs that describe what's actually built, write `prd-NNN-<slug>.md` + `MOCK_BRIEF.md` (with `[needs-mocks]` flag), update `docs/prd/index.md`.
+- **Phase 5** — Backfill PRDs via the `pm` agent (one invocation per PRD, sequential): read the relevant code + adopted/migrated PRD-like content, generate CUJs that describe what's actually built, write `prd-NNN-<slug>.md`, update `docs/prd/index.md`. **Mocks are not auto-generated** — backfilled CUJs describe existing code, so visual fidelity isn't enforced until you actively want it. The CUJs' "Mocks / Reference Designs" sections state "No mocks (backfilled from existing impl — run /design-feature Route D to add mocks if visual fidelity matters)."
 - **Phase 6** — Seed `docs/status.md` via the `status` agent: all CUJs enter with Impl=`merged`, QA=`—`, PM=`—`.
 - **Phase 7** — Hand off with summary and suggested next step.
 
@@ -3776,7 +3679,6 @@ For each canonical location, record whether it exists:
 - `docs/prd/prd-NNN-*.md` (list any present)
 - `docs/design/system.md`
 - `docs/design/design-*.md` (list any present)
-- `docs/ux/README.md`
 - `docs/status.md`
 - `scripts/qa-server.sh`
 - `.gitignore` (and whether it already excludes `.qa-dev-server.{pid,log}`, `docs/issues-attachments/`, `docs/gorilla/*/screenshots/`)
@@ -3853,11 +3755,9 @@ Skip steps for anything already present. Apply only the missing pieces.
 
    If the file already exists, leave it alone (Phase 5's PM agent will update its PRD listing as PRDs are backfilled).
 
-3. **`docs/ux/README.md`** — write only if missing. Use the same designer-rules content `/design-feature` Phase 2 writes. (Reference: that content is in `claude/commands/design-feature.md` Phase 2.)
+3. **`scripts/qa-server.sh`** — write only if missing. Use the canonical template from `claude/agents/qa.md` Step 1a, filling in `DEV_CMD` and `DEV_PORT` from Phase 0 detection. `chmod +x scripts/qa-server.sh` after writing.
 
-4. **`scripts/qa-server.sh`** — write only if missing. Use the canonical template from `claude/agents/qa.md` Step 1a, filling in `DEV_CMD` and `DEV_PORT` from Phase 0 detection. `chmod +x scripts/qa-server.sh` after writing.
-
-5. **`.gitignore`** — append any of these lines that aren't already present:
+4. **`.gitignore`** — append any of these lines that aren't already present:
    ```
    .qa-dev-server.pid
    .qa-dev-server.log
@@ -3960,8 +3860,8 @@ For each user-facing journey you observe in the code:
 
 1. Write a CUJ in your full template format (Context, Preconditions,
    Journey Steps with System Response / User Sees / Details, Edge Cases
-   & Error States, Mocks / Reference Designs with [needs-mocks] flag,
-   Acceptance Criteria as plain bullets).
+   & Error States, Mocks / Reference Designs, Acceptance Criteria as
+   plain bullets).
 
 2. The Journey Steps should describe what happens in the running product
    today. If you observe something in the code that's broken or
@@ -3970,12 +3870,14 @@ For each user-facing journey you observe in the code:
 
 3. Each acceptance criterion must be observable in the running product.
 
+4. In the "Mocks / Reference Designs" section, state:
+   "No mocks (backfilled from existing impl — run /design-feature
+   Route D to add mocks if visual fidelity matters)."
+   Do NOT generate mocks here. They're a separate, user-driven step
+   if/when the user wants visual fidelity testing for this feature.
+
 Then:
 - Write docs/prd/prd-NNN-<slug>.md
-- Write docs/ux/prd-NNN-<slug>-mockups/MOCK_BRIEF.md following the
-  /design-feature structure. Include the [needs-mocks] flag on every
-  CUJ — no mocks were drawn pre-implementation, so visual fidelity
-  testing will need them produced later.
 - Update docs/prd/index.md with a new entry. If the index doesn't yet
   list the PRD, add it under the "PRD listing" section.
 
@@ -4013,9 +3915,7 @@ Project organized.
 
 Created:
 - docs/prd/index.md (vision, persona, PRD listing with N PRDs)
-- docs/prd/prd-NNN-<slug>.md × N
-- docs/ux/<prd-dir>/MOCK_BRIEF.md × N (with [needs-mocks] flag)
-- docs/ux/README.md (designer rules)
+- docs/prd/prd-NNN-<slug>.md × N (no mocks — backfilled from impl)
 - docs/design/system.md
 - docs/design/design-<slug>.md × N
 - docs/status.md (X CUJs at Impl=merged, QA=—, PM=—)
@@ -4032,9 +3932,10 @@ review. Expect findings — the impl predates the spec, so QA may surface
 gaps between code and the backfilled CUJs. Address them with /quick-fix
 or refine the PRDs via /design-feature Route D as needed.
 
-For visual fidelity checking, produce mocks via Claude Desktop using
-the MOCK_BRIEF.md files (one per PRD). The handoff prompt is in each
-MOCK_BRIEF.md.
+If you want visual fidelity testing for any CUJ, run `/design-feature`
+and pick Route D — the conversational PM agent will walk through the
+existing CUJ, draw mocks for the agreed states, and save them under
+`docs/ux/<prd-dir>/`. Backfilled CUJs ship without mocks by default.
 ```
 
 If the project was already mostly organized and the skill did little ("idempotent re-run"), say so honestly:

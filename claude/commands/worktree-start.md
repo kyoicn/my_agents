@@ -51,11 +51,19 @@ Confirm it succeeded by running `git -C <main-path> worktree list` and checking 
 
 ### 5. Open Antigravity on the new worktree
 
+Antigravity bundles a CLI binary inside its app. Call it directly — this passes the folder path through to the IDE, which opens it as a workspace in a new window. `open -a` can launch the app without actually opening the folder, so prefer the direct binary.
+
+Primary command:
+
 ```bash
-antigravity "<main-parent>/<main-basename>-<slug>"
+"/Applications/Antigravity IDE.app/Contents/Resources/app/bin/antigravity-ide" "<main-parent>/<main-basename>-<slug>"
 ```
 
-If `antigravity` is not on PATH (`command -v antigravity` fails), surface the error and tell the user to open `<new-worktree-path>` manually in a new Antigravity window — the worktree is created, only the auto-open step failed.
+If the binary doesn't exist at that path (Antigravity IDE not installed, or installed in `~/Applications/` or another non-standard location), fall back to `open -a "Antigravity IDE" "<path>"` and warn the user that the app may launch without opening the folder — in that case they'll need to open it manually.
+
+If everything fails, surface the error and tell the user the new worktree path so they can open it manually. The worktree itself is fully created at that point — only the auto-open step failed.
+
+Note: `Antigravity.app` (without "IDE" in the name) is a separate non-IDE product and doesn't bundle a CLI — don't try to use its app bundle as a fallback.
 
 ### 6. Report
 

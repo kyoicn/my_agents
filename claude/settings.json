@@ -17,6 +17,7 @@
       "Bash(./scripts/qa-android.sh *)",
       "Bash(./scripts/qa-android.sh)",
       "Bash(chmod +x scripts/qa-android.sh)",
+      "Bash(adb devices)",
       "Read",
       "Edit",
       "Write",
@@ -27,7 +28,7 @@
       "mcp__playwright__*"
     ]
   },
-  "effortLevel": "high",
-  "theme": "dark-daltonized",
-  "model": "claude-opus-4-7"
+  "model": "claude-opus-4-7",
+  "effortLevel": "max",
+  "theme": "dark-daltonized"
 }

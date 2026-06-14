@@ -22,6 +22,29 @@ Read `docs/prd/index.md` and all files under `docs/design/` to orient yourself.
 
 Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `*-guidelines.md` files exist, read all of them before proceeding — they contain mandatory development and process rules that apply to every phase of this cycle. Store the list of discovered file paths and pass them to every subagent prompt below. If no guideline files exist, skip this step and proceed normally.
 
+### Worktree Label
+
+Compute a short worktree label so this cycle's subagents are distinguishable from any other Claude sessions running on the same repo (e.g., another `/dev-cycle` running from a different worktree, or the user editing in a parallel window). The label flows into FleetView via each subagent's `description` parameter.
+
+Steps:
+1. Run `git worktree list --porcelain` and find the entry whose `branch` is `refs/heads/main` (or `refs/heads/master`). The `worktree` line gives the main worktree's absolute path; take its basename — call it `<main-basename>` (e.g., `my_agents`).
+2. Get the current cwd's basename via `basename "$(pwd)"` — call it `<cwd-basename>`.
+3. Derive `<worktree-label>`:
+   - If `<cwd-basename>` equals `<main-basename>`: label is `main`.
+   - If `<cwd-basename>` starts with `<main-basename>-`: label is the suffix after the `-` (e.g., `data` for `my_agents-data`, `ui` for `my_agents-ui`).
+   - Otherwise: label is `<cwd-basename>` itself (fallback for non-conventional paths).
+
+**Every Agent tool call this skill makes in subsequent phases must prefix its `description` parameter with `<worktree-label>: `.** Examples (running from `my_agents-data`, label = `data`):
+
+| Without prefix | With prefix |
+|---|---|
+| `tl architecture review` | `data: tl architecture review` |
+| `planner: next round` | `data: planner: next round` |
+| `qa gate iteration 3` | `data: qa gate iteration 3` |
+| `task: implement filter UI` | `data: task: implement filter UI` |
+
+This applies to every subagent spawned by this skill — tl, planner, qa, status, pm, and every task-execution worker. It does not change anything inside the subagent's prompt body; only the `description` (the visible label).
+
 ---
 
 ## Mocks Check

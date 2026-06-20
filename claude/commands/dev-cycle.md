@@ -124,6 +124,7 @@ If planner reports nothing left to do (all CUJs in scope implemented and tests p
 ## Phase 3: Task Execution
 
 Read `docs/tasks.md`. For each parallel group, spawn all tasks simultaneously as background worktree agents:
+- `subagent_type: "coder"` — every task-execution agent uses the `coder` role definition (see `claude/agents/coder.md`). Coders own implementation + unit tests + local verification + commit; they explicitly do not modify PRDs/design docs/task plans and do not write integration/E2E tests (those belong to qa).
 - `isolation: "worktree"` — each agent gets its own branch
 - `run_in_background: true` — parallel execution
 - Each agent's prompt must be fully self-contained with task description, file paths, and acceptance criteria

@@ -27,6 +27,7 @@ When I say "execute tasks", "run tasks", "执行任务", "タスクを実行", o
 1. Read `docs/tasks.md` to get the task plan.
 2. Execute one parallel group at a time, starting from the first pending group.
 3. For each task in the group, spawn a background worktree agent — **all tasks in a group must be spawned in a single message** so they run in parallel:
+   - `subagent_type: "coder"` — every task-execution agent uses the `coder` role definition (see `claude/agents/coder.md`). Coders own implementation + unit tests + local verification + commit.
    - `isolation: "worktree"` — each agent gets its own branch
    - `run_in_background: true` — non-blocking
    - The agent's prompt must be **self-contained** — include the full task description, file paths, and acceptance criteria. The agent cannot see `docs/tasks.md` or this conversation.

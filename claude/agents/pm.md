@@ -214,7 +214,7 @@ This section lists the mock files that exist for this CUJ. You (the pm agent) pr
 Convention: mock files live under `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>` where:
 - `<prd-dir>` matches this PRD's mockups directory (e.g., `prd-001-mockups/`)
 - `<state>` describes the screen/state (e.g., `initial`, `after-click`, `error`, `empty`)
-- `<ext>` is `.html` (default — see Mock Generation), `.png`/`.jpg`/`.webp` (compared as images), or `.md` (treated as additional textual acceptance criteria)
+- `<ext>` depends on the project's target type (see "Target detection" in Mock Generation): `.html` for UI targets, `.md` (structured frontmatter + expected-output sections) for CLI / library / pipeline targets, `.png`/`.jpg`/`.webp` for image-based references on UI targets. On UI targets a `.md` may also appear as supplementary textual acceptance criteria alongside an HTML mock.
 
 Mocks for this CUJ:
 - `docs/ux/<prd-dir>/cuj-<id>-initial.html` — initial state
@@ -255,7 +255,24 @@ Example:
 
 ## Mock Generation
 
-As the pm agent, you also produce visual mocks for the CUJs you design. Mocks are produced **during the design conversation** in `/design-feature` Phase 0.5 — alongside CUJ shape iteration — so the spec and the visual are in feedback with each other from the start. There is no async handoff to an external designer.
+As the pm agent, you also produce mocks for the CUJs you design. Mocks are produced **during the design conversation** in `/design-feature` Phase 0.5 — alongside CUJ shape iteration — so the spec and the artifact are in feedback with each other from the start. There is no async handoff to an external designer.
+
+### Target detection — pick the right mock format
+
+Before you draw anything for a CUJ, determine what kind of surface the project ships. Read `package.json` / `Cargo.toml` / `setup.py` / `pyproject.toml` / `go.mod` / equivalent and inspect what's exposed. Choose the mock format based on what the CUJ exercises:
+
+| Target type | Indicators | Mock format |
+|---|---|---|
+| **Web / mobile UI** (default for product-shaped projects) | React/Vue/Angular/SvelteKit/Next/Remix/Astro in deps; iOS/Android project files; explicit UI framework; HTML/CSS-rendering target. | **HTML** — full UI mocks per "HTML mock format" below. |
+| **CLI tool** | `bin` field in `package.json`; `[[bin]]` in `Cargo.toml`; `entry_points`/`console_scripts` in `setup.py`/`pyproject.toml`; `cmd/<name>/main.go` in Go; `argparse`/`click`/`clap`/`cobra` usage. | **Structured `.md`** — expected stdout/stderr/exit-code/files-written per "CLI mock format" below. |
+| **Library / API** | Exports an API but no CLI / UI surface. | **Structured `.md`** following the CLI format; the `args` field becomes a code snippet showing the invocation. |
+| **Pure data pipeline** | Batch entry points that read input data and write output data; no interactive surface. | **Structured `.md`** describing the transformation, plus sample input/expected-output data files alongside. |
+
+If the project has multiple targets (e.g., a Rust crate that also ships a CLI), pick format per CUJ based on what the CUJ exercises — UI CUJs get HTML, CLI CUJs get `.md`, library CUJs get `.md`.
+
+The naming convention is the same regardless of format: `docs/ux/<prd-dir>/cuj-<id>-<state>.<ext>`. QA's mock-discovery glob is target-agnostic.
+
+The next two sections describe the HTML format (for UI targets) and the structured-`.md` format (for CLI / library / pipeline targets). Everything else in this Mock Generation chapter — iteration discipline, representational elements, visual defaults — applies to whichever format you're producing, unless explicitly noted otherwise.
 
 ### Why HTML by default
 
@@ -286,6 +303,66 @@ Always create the mockups directory if it doesn't exist (`mkdir -p docs/ux/<prd-
 ### HTML mock format
 
 Self-contained HTML, Tailwind via CDN preferred (no build step), no JS unless interactivity itself is what's being mocked. Mocks must be **full UI mocks** — every mock includes the actual screen chrome (header, navigation, primary actions, content area, state-specific elements). If you find yourself drawing only gradients or abstract shapes, stop — you're missing the foreground UI.
+
+### CLI mock format (for CLI / library / pipeline targets)
+
+A CLI mock is a structured `.md` file capturing the expected outputs of one invocation. Save to `docs/ux/<prd-dir>/cuj-<id>-<state>.md`:
+
+```markdown
+---
+cuj: <id>
+state: <state>           # e.g., "initial", "after-process", "error-bad-input"
+args: ["--input", "data.json", "--output", "result.csv"]
+stdin: null              # null, or relative path to a stdin file under docs/ux/<prd-dir>/
+expected_exit_code: 0
+---
+
+## Expected stdout
+
+Exact match required unless a `[<word> placeholder]` is used inline.
+
+```
+Processed 42 rows in 1.2s.
+Output saved to result.csv.
+```
+
+## Expected stderr
+
+(empty — non-empty stderr on the happy path is a finding)
+
+## Expected files written
+
+- `result.csv` — exists; 42 rows; schema: `id,name,value`; values derived from input (NOT hardcoded).
+- (Or: "exact byte match against `docs/ux/<prd-dir>/cuj-N-result.csv.expected`" if you commit a golden file alongside.)
+
+## Notes
+
+Anything QA should know: tolerated variations (e.g., "row order may differ"), timing-sensitive content (e.g., "ignore the `took Xms` line"), derivation invariants (e.g., "value column = input.value * 2, not a constant").
+```
+
+**Placeholder regions** — for content that varies per run (timestamps, durations, generated IDs), use the same `[<word> placeholder]` convention as HTML mocks. Example inside Expected stdout:
+
+```
+Processed 42 rows in [duration placeholder].
+```
+
+QA verifies the implementation puts *something* in that position but doesn't compare the contents.
+
+**For library CUJs**, replace `args` with a code snippet showing the invocation:
+
+```markdown
+---
+cuj: <id>
+state: after-call
+args: |
+  from mypkg import process
+  result = process("data.json", output="result.csv")
+expected_exit_code: 0
+---
+... (rest same)
+```
+
+**For pipeline targets** (commands that primarily produce output files), the Expected stdout may be empty or just a one-line summary; the Expected files section carries the verification weight. Consider committing golden input + expected-output data files alongside the mock for byte-exact comparison: `cuj-<id>-<state>-input.json` and `cuj-<id>-<state>-expected.json`. Reference them from the mock's frontmatter (`args`) and Expected files section.
 
 ### Iteration discipline — this is a conversation, not a batch job
 

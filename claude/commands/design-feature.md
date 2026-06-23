@@ -88,7 +88,9 @@ When you reach that bar, say: "I think I have enough to sketch CUJ shapes — le
 
 This is where spec and visual come together. For each CUJ, you (still acting as the pm role in the main thread) iterate the **shape** and the **mocks** with the user in lockstep — propose shape, agree on it, draw the first mock, iterate visual + shape together, propose additional variants. The pm subagent in Phase 1 inherits both: the agreed shapes AND the saved mock files.
 
-This phase is conversational and produces real artifacts (mock files saved to disk). For mock generation rules — file format choice, HTML defaults, iteration discipline, representational elements, visual defaults — **follow the "Mock Generation" section of `pm.md`** verbatim. The agent's rules live there; this skill orchestrates the loop.
+This phase is conversational and produces real artifacts (mock files saved to disk). For mock generation rules — file format choice, HTML/`.md` defaults, iteration discipline, representational elements, visual defaults — **follow the "Mock Generation" section of `pm.md`** verbatim. The agent's rules live there; this skill orchestrates the loop.
+
+**First**, before producing any mock for this PRD, follow the "Target detection" subsection in `pm.md`'s Mock Generation chapter to determine the project's target type (UI / CLI / library / pipeline). The resulting format choice — HTML for UI targets, structured `.md` for CLI / library / pipeline — applies to every mock in this Phase 0.5. The file paths below use `<ext>` as the placeholder; substitute the target-appropriate extension. The hardcoded examples in the Phase 0.5 steps use `.html` for brevity but are not literal — pick the extension target detection gave you.
 
 For each CUJ, one at a time:
 

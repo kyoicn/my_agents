@@ -39,7 +39,19 @@ adb devices          # device connected or emulator running?
 
 If `adb` is missing, tell the user: "install Android SDK platform-tools (e.g., `brew install android-platform-tools` on macOS) and ensure `adb` is on PATH." If no device/emulator is reachable, tell them either to connect a device with USB debugging on or to create + configure an AVD (and set `EMULATOR_NAME` in `scripts/qa-android.sh` so the script can boot it autonomously). For any CUJ targeting Android while these prereqs are missing, set Result to `BLOCKED` and FAIL the gate.
 
-**The same rule applies for any other target** (iOS, CLI, etc.): if you lack the capability to drive the real product, set Result to `BLOCKED`, do not fabricate verification.
+**CLI tools** — the project's build/runtime toolchain must be installed. Verify with the appropriate command for the project's language:
+
+```bash
+cargo --version          # Rust
+go version               # Go
+python3 --version        # Python (and pip / poetry / uv as the project uses)
+node --version           # Node
+ruby --version           # Ruby
+```
+
+QA writes a `scripts/qa-cli.sh` wrapper that encodes the project's build command and binary path — that script is the canonical invocation surface for every CUJ walk. See Step 7's "For CLI tools" section for the script template. If the toolchain is missing, tell the user what to install for the project's language. For any CUJ targeting a CLI while the toolchain is missing, set Result to `BLOCKED` and FAIL the gate.
+
+**The same rule applies for any other target** (iOS, library, etc.): if you lack the capability to drive the real product, set Result to `BLOCKED`, do not fabricate verification.
 <!-- /SYNC:prerequisites -->
 
 ## Responsibilities and Boundaries
@@ -552,13 +564,189 @@ Placeholder regions, severity tagging, and the `NO_MOCK` fallback work identical
 Flakiness handling (compare `run1` vs `run2` per step) — identical rules to web: both PASS → PASS, both FAIL → FAIL+bug, one PASS one FAIL → FAIL+`[FLAKY]` with severity by impact.
 <!-- /SYNC:android-app-verification -->
 
-#### For CLI tools / APIs:
-- Run the commands or make the API calls described in the CUJs
-- Verify output format, content, and error handling match the spec
+<!-- SYNC:cli-verification -->
+#### For CLI tools:
+
+You MUST drive a real subprocess via the canonical project script `scripts/qa-cli.sh`. If the project's language toolchain is missing, follow the **Prerequisites** section above — set affected CUJs to `BLOCKED`. Do not fabricate verification by reading source code.
+
+**Every CUJ is walked TWICE** to detect flakiness and non-determinism (timing-dependent output, race conditions in parallel work, RNG without a fixed seed). The two walks are independent: each invocation gets a fresh subprocess and its own artifacts dir.
+
+**CLI lifecycle — single canonical script. Use this ONLY. Do not improvise.**
+
+All CLI invocations during QA go through `scripts/qa-cli.sh`. The script encapsulates build, invoke (with stdout/stderr/exit-code capture), and cleanup. The permission allowlist must include `Bash(./scripts/qa-cli.sh *)` and `Bash(./scripts/qa-cli.sh)`. **Do not invoke the CLI binary directly, do not use `cargo run` / `python -m foo` / `node dist/cli.js` ad-hoc, do not use `kill` / `pkill` — use the script for every operation.** If you need a capability the script doesn't expose, extend the script (Step 1a below); don't invent a one-off command.
+
+**Step 1a — install the script if it doesn't exist.** Check for `scripts/qa-cli.sh` at the start of QA. If missing, create it.
+
+Determine project-specific values by reading the project:
+- `CLI_BIN` — the invocation. From `package.json`'s `bin` field, `Cargo.toml`'s `[[bin]]`, `setup.py` / `pyproject.toml` `entry_points`, or the project's documented invocation. E.g., `./target/debug/mytool`, `python -m mytool`, `node dist/cli.js`, `./mytool`.
+- `BUILD_CMD` — what to run before invocations. E.g., `cargo build`, `npm run build`, `pip install -e .`, `go build -o mytool ./cmd/mytool`.
+
+Then write `scripts/qa-cli.sh` with this exact content (substituting `<CLI_BIN>` and `<BUILD_CMD>`):
+
+```bash
+#!/bin/bash
+# Canonical CLI lifecycle for the QA agent.
+# QA uses this script as its ONLY interface for CLI invocations.
+# Do not invoke the binary, cargo run, python -m, etc. directly during QA.
+set -e
+
+CLI_BIN="<CLI_BIN>"           # e.g., "./target/debug/mytool", "python -m mytool"
+BUILD_CMD="<BUILD_CMD>"       # e.g., "cargo build", "npm run build", "pip install -e ."
+DEFAULT_TIMEOUT_SEC=30
+WORK_DIR=".qa-cli"
+
+mkdir -p "$WORK_DIR"
+
+next_run_dir() {
+  # mktemp guarantees uniqueness across rapid invocations on both macOS and Linux.
+  mktemp -d "$WORK_DIR/run.XXXXXX"
+}
+
+case "${1:-}" in
+  build)
+    $BUILD_CMD
+    echo "built"
+    ;;
+
+  invoke)
+    # invoke -- <args...>
+    shift
+    [ "${1:-}" = "--" ] && shift
+    RUN_DIR=$(next_run_dir)
+    mkdir -p "$RUN_DIR"
+    printf '%s\n' "$@" > "$RUN_DIR/args.txt"
+    set +e
+    timeout "$DEFAULT_TIMEOUT_SEC" $CLI_BIN "$@" > "$RUN_DIR/stdout.txt" 2> "$RUN_DIR/stderr.txt"
+    EXIT=$?
+    set -e
+    echo "$EXIT" > "$RUN_DIR/exit-code.txt"
+    echo "$RUN_DIR"
+    ;;
+
+  invoke-stdin)
+    # invoke-stdin <stdin-file> -- <args...>
+    STDIN_FILE="$2"
+    shift 2
+    [ "${1:-}" = "--" ] && shift
+    RUN_DIR=$(next_run_dir)
+    mkdir -p "$RUN_DIR"
+    cp "$STDIN_FILE" "$RUN_DIR/stdin.txt"
+    printf '%s\n' "$@" > "$RUN_DIR/args.txt"
+    set +e
+    timeout "$DEFAULT_TIMEOUT_SEC" $CLI_BIN "$@" < "$STDIN_FILE" > "$RUN_DIR/stdout.txt" 2> "$RUN_DIR/stderr.txt"
+    EXIT=$?
+    set -e
+    echo "$EXIT" > "$RUN_DIR/exit-code.txt"
+    echo "$RUN_DIR"
+    ;;
+
+  clean)
+    rm -rf "$WORK_DIR"/*
+    echo "cleaned $WORK_DIR/*"
+    ;;
+
+  *)
+    cat <<USAGE
+usage: $0 <subcommand>
+  build                                     run BUILD_CMD
+  invoke -- <args...>                       run CLI; capture stdout/stderr/exit; print run dir
+  invoke-stdin <stdin-file> -- <args...>    same, but pipe file as stdin
+  clean                                     wipe past run dirs
+USAGE
+    exit 1
+    ;;
+esac
+```
+
+After writing, `chmod +x scripts/qa-cli.sh`. Then ensure `.gitignore` excludes `.qa-cli/` (append if missing) — captured stdout/stderr/exit codes from QA runs are transient and never committed. The script itself **is** committed (project infrastructure).
+
+**Step 1b — use the script for every invocation.** Sample lifecycle:
+
+```bash
+./scripts/qa-cli.sh build                          # at the start of QA (or after code changes)
+RUN_DIR=$(./scripts/qa-cli.sh invoke -- --foo bar input.txt)   # capture single run
+./scripts/qa-cli.sh invoke-stdin in.txt -- --x y   # for commands that read stdin
+./scripts/qa-cli.sh clean                          # at end of session if you want to reset
+```
+
+That's the entire interface. If you find yourself wanting to type `cargo run`, `python -m`, `node dist/cli.js`, `kill`, or any other invocation/process command, stop — extend the script by adding a new case branch and re-saving it, then call the script.
+
+**The walk — observe-decide-act loop (each of the two runs):**
+
+For each CUJ in scope, perform two independent walks (`run1`, `run2`). Each walk:
+
+1. **Build if needed** (skip if the source hasn't changed since the last build): `./scripts/qa-cli.sh build`.
+
+2. **Capture baseline state**. CLI CUJs often have state in the form of input files on disk, config, env. Note what's relevant before the invocation (`ls`, `cat`, hash of input file, etc.) — needed for fabrication detection later.
+
+3. **Walk each Journey Step** from the CUJ spec, in order. For each step:
+   - **Resolve the invocation** — the spec describes a user action (e.g., "user runs `mytool process --input data.json`"). Prepare the exact args.
+   - **Act** — `RUN_DIR=$(./scripts/qa-cli.sh invoke -- <args>)`. (Use `invoke-stdin` if the command reads stdin.)
+   - **Copy artifacts to the canonical QA path** — `cp -r "$RUN_DIR" docs/qa-artifacts/<run-id>/<cuj-id>/<run>/<NN>-<step-slug>/`. The folder contains `args.txt`, `stdout.txt`, `stderr.txt`, `exit-code.txt`, and optionally `stdin.txt`.
+   - **Verify** — read each artifact and compare against the CUJ's "System response" / "User sees" descriptions. Exit code matches the spec (usually 0 for happy path, non-zero for documented errors). stdout/stderr contain (or are) the strings the spec names. If the command writes output files, verify their existence + shape (row count, JSON schema, etc.). Do not rely on reading source code for verification — use the captured artifacts.
+
+4. **Walk each Edge Case & Error State** the same way — artifacts under `.../<run>/edge-<N>-<slug>/`.
+
+5. **Close cleanly** — CLI usually has nothing to "close," but if the CUJ involves background processes (daemons, watchers, file locks), confirm they're released after the invocation. The script's `clean` removes `.qa-cli/*` but does NOT kill processes — surface any leftover processes as a finding.
+
+**Mocks for CLI — file format and fidelity comparison:**
+
+CLI mocks live at `docs/ux/<prd-dir>/cuj-<id>-<state>.md` (the same `.md` extension already in QA's mock glob — but for CLI targets, the contents are structured expected outputs, not just textual criteria). Format (produced by `pm` during `/design-feature` Phase 0.5):
+
+```markdown
+---
+cuj: <id>
+state: <state>
+args: ["--input", "data.json", "--output", "result.csv"]
+stdin: null              # null, or relative path to a stdin file under docs/ux/<prd-dir>/
+expected_exit_code: 0
+---
+
+## Expected stdout
+(exact match required, unless a placeholder is used)
+
+## Expected stderr
+(empty by default; non-empty on happy path is a finding)
+
+## Expected files written
+- <path> — schema / shape / derivation rules
+
+## Notes
+(tolerated variations, timing-sensitive lines to ignore, derivation invariants)
+```
+
+For each Journey Step with a matching mock by state name:
+
+1. **Read the mock `.md`**, parse frontmatter (args, expected_exit_code, stdin) and prose sections.
+2. **Compare run artifacts to mock expectations:**
+   - `exit-code.txt` == `expected_exit_code` → otherwise log `[<sev>][BUG]` Wrong exit code.
+   - `stdout.txt` matches "Expected stdout" (after ignoring placeholders) → otherwise log `[<sev>][VISUAL_DEVIATION]` (for CLI, "visual deviation" = "output text doesn't match the golden output"; severity scales: a cosmetic single-line difference is LOW; primary-output content wrong is HIGH/CRITICAL).
+   - `stderr.txt` non-empty when spec says empty → log finding with severity by impact.
+   - Expected files written → check each named file exists; verify schema/shape per spec.
+3. **Honor the Notes section** — if it says "ignore the `took Xms` line," strip those lines from both sides before comparison.
+4. **Placeholder regions** — if the mock's Expected stdout contains text matching `[<word> placeholder]` (e.g., `[duration placeholder — varies per run]`), treat that line as a placeholder. The implementation's output must have *something* in that position but its contents are not compared. Record `Placeholder regions verified by position: <list>` in Artifacts. Don't log placeholder-region differences as `VISUAL_DEVIATION`.
+
+**If no mock exists for a CUJ state** (glob returns nothing): log `Mocks: NO_MOCK` for that step. Skip fidelity comparison; functional verification still runs (does the command run? exit code reasonable?). Same rule as web — `NO_MOCK` is a label, not a failure.
+
+**Fabrication detection for CLI** — beyond the generic checklist below, specifically watch for:
+
+- **Does output vary with input?** Run a second invocation with deliberately different inputs (different row count, different file contents). If stdout is identical or the output file is unchanged, the tool isn't doing the work → `[<sev>][FABRICATION]`.
+- **Does exit code reflect reality?** A CLI that always exits 0 even on garbage input is fabricating "success."
+- **Do claimed-written files actually appear?** Are their contents derived from input, or hardcoded sample data?
+- **Are computed numbers actually computed?** A pipeline reporting "Processed 42 rows" when the input had 100 rows is either buggy or fake — verify the number tracks the input.
+
+**Flakiness handling — comparing the two runs:** identical rules to web. Both PASS → step `PASS`. Both FAIL → `FAIL` + `[BUG]` (or `[REGRESSION]` / `[FABRICATION]` if it fits). One PASS, one FAIL → `FAIL` + `[FLAKY]` (be pessimistic — a flaky CLI is just as broken as a flaky UI). Include both run dirs in the report so the inconsistency is visible.
+
+**Per-CUJ requirements that gate the Result:**
+- Both `run1` and `run2` artifact dirs exist with `args.txt`, `stdout.txt`, `stderr.txt`, `exit-code.txt` for each Journey Step. Missing artifacts → step Result is `NOT_RUN`, CUJ Result is `FAIL`.
+- Every "User sees" / "System response" assertion verified against the captured artifacts, not against your reading of the source code.
+<!-- /SYNC:cli-verification -->
 
 #### For libraries / packages:
-- Write and run example usage scripts that exercise the CUJ flows
-- Verify the API behaves as specified
+
+For library CUJs (the user-facing API of a library/package), the verification surface is the public API plus example scripts. Write a short script under `docs/qa-artifacts/<run-id>/<cuj-id>/run<N>/example.{py,js,rs,go}` that imports and uses the library exactly as the CUJ describes. Run it twice (two-run flakiness applies the same way) and capture stdout/stderr/exit code identically to the CLI flow above. Mocks for libraries follow the same structured `.md` format as CLI mocks — replace `args` with the code snippet showing the invocation.
+
+If your project has both a CLI surface AND a library surface for the same logic, verify both — they often drift independently.
 
 **What to look for during manual verification:**
 - Does the UI actually render correctly? (CSS broken, elements off-screen, overlapping content)

@@ -63,6 +63,15 @@ Key questions for scope assessment:
 - Is this actually a missing feature rather than a bug? If no CUJ defines the expected behavior, it's a spec-gap.
 - Does the reported "expected behavior" directly contradict what the PRD specifies? If so, it's a spec-conflict — don't assume either side is correct.
 
+**e) Check the track: is this actually an engineering task?**
+
+If diagnosis reveals the report isn't a defect at all — nothing deviates from spec for a user; it's infrastructure, tooling, operational hardening, or tech debt (e.g., "the deploy pipeline has no rollback step" filed as a bug) — it's misfiled. Reclassify it:
+1. File it as an `ENG-NNN` entry in `docs/eng-backlog.md` using the canonical schema from `/eng-task` (consume the `Next-ID:` counter; carry Background/Scope/Acceptance criteria from your diagnosis; **derive a concrete, executable `Verify` check** — an entry without one may not be filed; set Priority honestly).
+2. Remove the issue's h3 block from `docs/issues.md` (and delete any files under `docs/issues-attachments/` its Screenshots field lists).
+3. Tell the user what you did and why, citing the new ENG ID.
+
+Separately: if diagnosing a *genuine* defect surfaces **adjacent tech debt that is not part of the fix** (the fix works without it, but the debt made the bug possible or will bite again), don't fold it into the fix's scope and don't lose it — file it as its own ENG entry with `Relates-to: Issue <id>`, and mention the ENG ID in your diagnosis. The defect keeps its own track.
+
 ### 3. Output diagnosis
 
 For each issue, print a structured diagnosis:

@@ -42,6 +42,7 @@ Before decomposing anything, build a thorough understanding from the sources of 
 - `docs/design/design-*.md` — component/domain-level design docs
 - `docs/qa-report.md` — engineering-side per-CUJ verdicts (PASS/FAIL/BLOCKED/etc.) and bug list (if it exists — failures become tasks). **This is the canonical source for "what's done on the engineering side."**
 - `docs/pm-review.md` — product-side per-CUJ verdicts (Satisfied/Caveats/Not done) plus recommended next-iteration priorities (if it exists — Caveats and Not-done become tasks; the priority list is your top input for what to plan).
+- `docs/eng-backlog.md` — open engineering tasks (infrastructure, tooling, operational hardening, tech debt; if it exists). Each `ENG-NNN` entry carries Priority (`blocking`/`P1`/`P2`), acceptance criteria, a `Verify` check, and optional `Ordering` constraints. **This is a first-class input alongside PRDs — `blocking` entries outrank all feature work.**
 - The actual codebase — **always verify what's truly implemented by reading the code**, don't rely solely on docs
 - Project structure — `ls` key directories, read entry points
 - `package.json` / `Podfile` / `build.gradle` / equivalent — tech stack and dependencies
@@ -58,7 +59,14 @@ If the user provided a specific goal, use that. Otherwise, derive **remaining CU
 - The remainder are unfinished. CUJs with QA `PASS` but PM `Caveats`/`Not done` are unfinished too — PM's product-side verdict is a gate.
 - If `docs/qa-report.md` or `docs/pm-review.md` does not exist (e.g., iteration 1), treat all CUJs as unfinished.
 
-Then prioritize:
+Then prioritize across all three work sources (bugs, engineering tasks, CUJs) using this ladder:
+
+1. **MEDIUM-or-higher bugs from `docs/qa-report.md`** — the loop invariant; never schedule new work above unresolved MEDIUM+ bugs.
+2. **`blocking` entries from `docs/eng-backlog.md`** — a deploy/release-blocker makes everything else undeliverable; it outranks feature work.
+3. **Unfinished CUJs and `P1` ENG entries, interleaved** — sequenced by pm-review priorities, hard dependencies, and ENG `Ordering` constraints.
+4. **LOW bugs and `P2` ENG entries** — as capacity allows.
+
+Within tier 3:
 - Respect CUJ dependency ordering — if CUJ-B depends on CUJ-A, CUJ-A must be in an earlier parallel group.
 - If `docs/pm-review.md` exists, **its "Recommended Next-Iteration Priorities" list is your starting order** — PM has already done strategic sequencing for you. Adjust only for hard dependencies or fresh signal you see in the code.
 - Identify the highest-impact unfinished CUJs.
@@ -87,6 +95,11 @@ For each task, specify:
 - What to do (concrete steps, not vague directions)
 - Files likely involved (so agents know where to start and so conflicts are visible)
 - Acceptance criteria (how to verify the task is done)
+
+For tasks derived from `docs/eng-backlog.md` entries, additionally:
+- Reference the ENG ID in the task title (e.g., `Task: Standardize deploy pipeline (ENG-004)`) so the review gate and cleanup can trace it.
+- Copy the entry's `Verify` check verbatim into the task's "Done when" — the coder must execute it and report the evidence.
+- Honor `Ordering` constraints when grouping: an entry that must land before other work goes in an earlier parallel group than that work.
 
 ### 6. Identify conflict risks
 

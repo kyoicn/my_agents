@@ -1,17 +1,22 @@
 ---
-description: Fix a small-scope issue directly. Triages first (if not already triaged), then implements the fix, runs tests, and commits. For large issues, escalates to /dev-cycle.
+description: Fix a small-scope work item directly — a defect from docs/issues.md, an ad-hoc description, or a small engineering task from docs/eng-backlog.md (quick-fix ENG-NNN). Triages first (if not already triaged), then implements, runs tests, and commits. For large issues, escalates to /dev-cycle; ENG entries with Ordering constraints always go through the planner.
 ---
 
 # Quick Fix
 
-You are fixing a small-scope issue — a clear bug, spec deviation, or defect that can be resolved in 1-3 files without design changes.
+You are fixing a small-scope work item — a clear bug, spec deviation, or defect that can be resolved in 1-3 files without design changes, or a small engineering task from `docs/eng-backlog.md` with the same profile.
 
 ## Input
 
 Check how you were invoked:
 - **With an issue ID** (e.g., `quick-fix 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md` and fix it. If the block has a `Triage` field, use it as the diagnosis (verify against current code quickly). If not, run the triage logic from `/triage` inline first.
+- **With an ENG ID** (e.g., `quick-fix ENG-004`): Read that h3 block from `docs/eng-backlog.md`. The entry's Scope/Acceptance criteria/Verify fields are the spec — no triage needed. Two eligibility gates before touching code:
+  - The entry must pass the same small-scope gate as a defect (1-3 files, no design change, no shared interface or data-model change). Larger → STOP, tell the user it goes through the planner (`/dev-cycle` or `/user:planner`).
+  - The entry must have **no `Ordering` field**. Ordering constraints are honored by the planner's group sequencing; ad-hoc execution loses them. Constrained → STOP, same redirect.
 - **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that ad-hoc description in one shot, without going through `docs/issues.md`.
 - **Without arguments**: Read `docs/issues.md`, pick the first **triaged** small/medium-scope block (one whose `Triage` field shows scope=small or scope=medium), and fix it.
+
+**The scope gate applies regardless of where the diagnosis came from** — an existing `Triage` field, your inline triage, or an ENG entry's fields. If the (existing or freshly derived) scope is large, spec-gap, or spec-conflict, STOP and escalate per Step 1; never proceed because a diagnosis already exists.
 
 ## Process
 
@@ -57,6 +62,8 @@ If a dev server can be started and the fix is UI-visible or API-observable:
 - Manually verify the fix works as expected
 - Check that adjacent functionality isn't broken
 
+**For an ENG entry, additionally execute the entry's `Verify` check exactly as written** and confirm the expected outcome. Report the command and its output to the user — that evidence is the entry's done-gate. If the check fails, the task is not done; do not proceed to commit.
+
 ### 6. Commit
 
 Commit with a conventional commit message:
@@ -65,6 +72,13 @@ fix: <concise description>
 
 Refs CUJ-<ID> (<prd-file>)
 <one-line explanation of root cause and what was changed>
+```
+
+For an ENG entry, reference the ENG ID instead (this is the permanent record once the block is removed):
+```
+<type>: <concise description> (ENG-NNN)
+
+<one-line explanation of what was done and the Verify outcome>
 ```
 
 ### 7. Clean up the issue + its attachments
@@ -80,6 +94,8 @@ The fix is recorded in git history — the inbox doesn't need to track resolved 
 
 If the issue came from a direct `quick-fix "<description>"` invocation (no block in `docs/issues.md`), there's nothing to clean up — the git commit is the only record.
 
+If the work item was an ENG entry: remove its h3 block from `docs/eng-backlog.md` (including the leading `---` separator; leave the preamble and `Next-ID:` line untouched). There are no screenshots to delete.
+
 ## Scope guard
 
 If at any point during the fix you realize the issue is larger than expected:
@@ -92,6 +108,8 @@ Do not push through a large fix just because you started. It's better to stop ea
 ## What NOT to do
 
 - Don't attempt large fixes — escalate to `/dev-cycle`
+- Don't fast-path an ENG entry that has an `Ordering` field — constrained entries go through the planner, whatever their size
+- Don't complete an ENG entry without executing its `Verify` check and reporting the evidence
 - Don't refactor or "improve" code beyond what the fix requires
 - Don't modify PRD files or design docs — the spec isn't wrong, the code is
 - Don't skip running tests

@@ -51,7 +51,22 @@ This setup creates a team of specialized AI agents that collaborate in an autono
    /triage  ──► appends Triage field to the issue block ──► /quick-fix  (small/medium) ──► commit
                                                       ├──► /dev-cycle  (large)
                                                       ├──► /design-feature  (spec-gap — feature needs design)
-                                                      └──► ask user        (spec-conflict — report vs PRD)
+                                                      ├──► ask user        (spec-conflict — report vs PRD)
+                                                      └──► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
+```
+
+**Engineering tasks (backlog pipeline):**
+
+```
+/eng-task ──► docs/eng-backlog.md (h3 block: Background, Scope, Acceptance criteria,
+      │        mandatory executable Verify, Priority, optional Ordering/Relates-to;
+      │        tl also files entries here during architecture review)
+      │
+      ├──► planner (first-class input: blocking > CUJs; P1 interleaved with CUJs;
+      │             P2 as capacity allows) ──► coder worktrees ──► tl review confirms
+      │             Verify evidence and removes completed blocks
+      │
+      └──► /quick-fix ENG-NNN  (fast path: small scope AND no Ordering constraint)
 ```
 
 ### The agents
@@ -78,7 +93,8 @@ Each row links to the canonical command definition.
 | [`/dev-cycle`](commands/dev-cycle.md) | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict. Use with `/loop /dev-cycle` for continuous operation. |
 | [`/report-bug`](commands/report-bug.md) | Conversational bug intake with screenshot support (clipboard via `pngpaste` → file path → interactive `screencapture` → skip). Writes an h3 block to `docs/issues.md`; screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
 | [`/triage`](commands/triage.md) | Diagnose issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or freeform description). Appends a structured `Triage` field — scope, root cause, files, recommended action, risk. |
-| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope issues. Operates on a `docs/issues.md` block by ID or on an ad-hoc description. Escalates if scope expands mid-fix. |
+| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — refused if the entry has an Ordering constraint). Escalates if scope expands mid-fix. |
+| [`/eng-task`](commands/eng-task.md) | Conversational intake for engineering tasks (infrastructure, tooling, operational hardening, tech debt) — the third track alongside defects and features. Writes an h3 block to `docs/eng-backlog.md` with a **mandatory mechanically executable `Verify` check** (no Verify → no entry), Priority (`blocking`/`P1`/`P2`), and optional Ordering constraints. Owns the canonical classification rule for the three tracks. Offers the `/quick-fix ENG-NNN` fast path for small, unconstrained entries. |
 | [`/gorilla-test`](commands/gorilla-test.md) | Manual-only adversarial exploratory test session against the running product. `--time <30m\|1h\|...>` (default 30m, max 4h), optional `--path </articles>`. Files every finding to `docs/issues.md`; per-session output in `docs/gorilla/<session-id>/`. |
 | [`/organize-project`](commands/organize-project.md) | One-time-per-project skill to retrofit an existing project into the canonical pattern. Audits scattered docs broadly, reconciles per-doc with user (migrate/adopt/preserve/ignore), scaffolds missing infrastructure, derives design docs from code, backfills PRDs that describe what's actually built. **Idempotent**. |
 | [`/worktree-start`](commands/worktree-start.md) | Spin up a parallel Claude session: create a new git worktree at `../<repo>-<slug>` on branch `feature/<slug>`, open it in a new Antigravity window. Lets you work on UI, data, mocks, etc. simultaneously without disturbing the current window. |
@@ -128,6 +144,20 @@ During the session, the agent saves each mock to disk and includes the absolute 
 
 The three-stage pipeline (`report → triage → fix-or-escalate`) is well-factored: each step is independently invocable, and `/report-bug` chains into `/triage` on user opt-in for the common all-in-one flow.
 
+**Engineering tasks:**
+```
+/eng-task "<description>"           # conversational intake — classification check,
+                                    # Background/Scope/Acceptance criteria, mandatory
+                                    # executable Verify, Priority, optional Ordering;
+                                    # writes h3 block to docs/eng-backlog.md
+/quick-fix ENG-NNN                  # fast path for small, unconstrained entries
+/dev-cycle                          # everything else: planner schedules entries
+                                    # against CUJs and bugs; coder executes; tl
+                                    # confirms Verify evidence and closes the entry
+```
+
+Which track does work belong to? **Does the product deviate from its spec for a user today?** → defect (`/report-bug`). **Does it change what the product does for users** (product surface, needs design)? → feature (`/design-feature`). **Everything else that changes code, infra, tooling, or process** → engineering task (`/eng-task`). Hybrids split at the boundary: a defect whose fix reveals tech debt keeps the fix as the defect and files the debt as a linked ENG entry; a feature with infra prerequisites gets ENG entries linked from the PRD, scheduled ahead of it. (`/eng-task` holds the canonical version of this rule; `/triage` applies it to reroute misfiled reports.)
+
 **Parallel sessions across worktrees:**
 
 When you want to drive multiple concerns in parallel — UI in one window, data pipelines in another, mocks in a third — without the windows fighting over files or branches, use the worktree commands. Each `/worktree-start` opens a new Antigravity window with its own Claude session, on its own branch.
@@ -173,6 +203,7 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 13. **Mocks produced during design, not as an async handoff**: The same `pm` agent that drives `/design-feature`'s discovery and CUJ-shape iteration also produces the HTML mocks — synchronously, in lockstep with shape iteration. Mocks save to `docs/ux/<prd-dir>/cuj-<id>-<state>.html`. The dev-cycle's Mocks Check is a fallback for CUJs that never went through `/design-feature` (e.g., backfilled by `/organize-project`); when found, it points the user to `/design-feature` Route D to add the mocks.
 14. **Deterministic verdict**: `/dev-cycle`'s final phase derives DONE/CONTINUE/BLOCKED mechanically from the QA verdict + remaining `[ ]` CUJs after PM review. No additional agent call needed.
 15. **Four-way role split: design / decompose / implement / verify**: `tl` designs (read code → propose architecture → maintain `docs/design/`); `planner` decomposes (read PRDs + design + status → propose tasks → write `docs/tasks.md`); `coder` implements (read task → write code + unit tests → commit); `qa` verifies (read PRDs + code + running product → write integration/E2E tests → produce `docs/qa-report.md` with gate authority). No role does another's work. tl doesn't write feature code; planner doesn't pick the architecture; coder doesn't write E2E tests; qa doesn't write unit tests. Each role's "What NOT to do" list enforces the boundary, so the orchestrator has clear delegation rules and any new requirement routes to exactly one owner.
+16. **Three intake tracks: defect / feature / engineering task**: work that is neither broken-from-the-user's-perspective nor a product feature — infrastructure, tooling, operational hardening, tech debt — has its own intake (`/eng-task` → `docs/eng-backlog.md`) instead of being forced into `issues.md` or a PRD. The backlog is deliberately a *backlog*, not an inbox: entries sit prioritized (`blocking`/`P1`/`P2`) until the planner schedules them, unlike issues.md which triage drains. Three invariants keep it from becoming a dumping ground: (a) every entry carries a **mechanically executable `Verify` check** filed at intake — since eng tasks bypass QA's CUJ walks and PM review, the Verify (run by coder, confirmed by tl at code review) is their entire functional gate; (b) `tl` owns the track end-to-end — files entries during architecture review, gates completions out at code review; (c) priority is a cross-source ladder the planner enforces: MEDIUM+ QA bugs > `blocking` ENG > CUJs interleaved with `P1` ENG > LOW bugs and `P2` ENG. `/dev-cycle` won't report `done` while a `blocking` entry is open; open P1/P2 entries persist across cycles by design.
 
 ---
 
@@ -226,6 +257,9 @@ Generated by the loop in any project that uses this setup:
     ├── issues.md                   # bug intake (h3-block format, written by /report-bug and gorilla)
     ├── issues-attachments/         # bug screenshots — gitignored, deleted on /quick-fix
     │   └── <issue-id>-<N>.png      # one per attached screenshot
+    ├── eng-backlog.md              # engineering-task backlog (ENG-NNN h3 blocks with mandatory
+    │                               # Verify; written by /eng-task, tl, /triage; closed by tl
+    │                               # review or /quick-fix; Next-ID counter in preamble)
     ├── gorilla/                    # per-session gorilla output (chronological history)
     │   └── <session-id>/
     │       ├── report.md           # this session's summary (committed)
@@ -389,6 +423,7 @@ Then verify with:
 - `/report-bug "test bug"` — should drive conversational intake, attempt screenshot capture (prompts you through the options), write an h3 block to `docs/issues.md`, and ensure `docs/issues-attachments/` is in `.gitignore`
 - `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks and append a `Triage` field to each
 - `/quick-fix <issue-id>` — should fix the issue and remove the block + its referenced screenshots
+- `/eng-task "test task"` — should apply the classification rule (redirecting defects/features), drive conversational intake, refuse to file without a mechanically executable `Verify`, write an h3 block to `docs/eng-backlog.md` (creating it with the `Next-ID:` preamble on first use), and offer `/quick-fix ENG-NNN` for small entries without Ordering constraints
 - `/gorilla-test --time 5m` — should set up a session, ensure the dev server is up, spawn the gorilla, and file any reproducible findings to `docs/issues.md` (use a tiny budget to spot-check the wiring; for a real session use 30m+)
 - `/organize-project` — in a project that has working code but no `docs/prd/`, should audit existing markdown broadly, propose how to reconcile non-canonical docs, scaffold infrastructure, and backfill PRDs + design docs from the code. Idempotent — re-running on an already-organized project should be a near-noop
 - `/worktree-start test-parallel` — should create `../<repo>-test-parallel` on a new `feature/test-parallel` branch and open it in a new Antigravity window

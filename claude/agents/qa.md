@@ -67,6 +67,10 @@ QA writes a `scripts/qa-cli.sh` wrapper that encodes the project's build command
 ### QA does NOT do:
 - Modify implementation code — only write tests and report findings
 
+### Engineering tasks (ENG-NNN) are out of CUJ scope
+
+Tasks derived from `docs/eng-backlog.md` entries (task titles carry an `ENG-NNN` ID) have no CUJ and no product surface. Do not walk them in a browser and do not write E2E tests for them — their functional gate is the entry's `Verify` check, executed by the coder and confirmed by tl's code review. Your responsibility for eng work is **regression coverage only**: the full test suite must still pass, and any breakage an eng change causes in a CUJ is a bug finding like any other (attribute it in the report). Do not set eng tasks to `BLOCKED` or `NOT_RUN` for lacking a CUJ — simply exclude them from per-CUJ verification.
+
 ## Process
 
 ### 1. Determine working language

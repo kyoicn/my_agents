@@ -16,7 +16,7 @@ Throughout these instructions:
 
 Next, read `docs/loop-state.md` if it exists to understand the current iteration number and any carry-over context from the previous cycle. **Pay special attention to the QA Gate section** — if the previous iteration ended with QA FAIL, this iteration's Planner must prioritize fixing those failures before taking on new work.
 
-Read `docs/prd/index.md` and all files under `docs/design/` to orient yourself.
+Read `docs/prd/index.md`, all files under `docs/design/`, and `docs/eng-backlog.md` (if it exists — open engineering tasks; `blocking` entries factor into planning and the final verdict) to orient yourself.
 
 ### Guidelines Discovery
 
@@ -86,10 +86,15 @@ design decisions that need to be made before the next round of
 implementation? Read docs/prd/index.md, active PRDs under docs/prd/,
 all files under docs/design/, docs/status.md, and the codebase.
 Update the appropriate design docs (system.md for cross-cutting,
-design-<slug>.md for component-specific) and return a summary of:
+design-<slug>.md for component-specific). If you identify needed
+engineering work with no product surface (infrastructure, tooling,
+operational hardening, tech debt), file it as an ENG entry in
+docs/eng-backlog.md per Section 6 of your role definition — every
+entry needs a concrete, executable Verify check. Return a summary of:
 1. What design decisions were made or updated
-2. What constraints the planner should know about
-3. Any blockers that require user input before work can proceed"
+2. What ENG entries you filed (IDs), if any
+3. What constraints the planner should know about
+4. Any blockers that require user input before work can proceed"
 ```
 
 If tl reports a **blocker requiring user input**, stop the loop, update `docs/loop-state.md` with status `blocked`, and notify the user with the blocker details.
@@ -103,16 +108,22 @@ Spawn a `planner` subagent:
 ```
 Prompt: "Based on the current project state, update docs/tasks.md with
 the next round of tasks. Read docs/prd/index.md and active PRDs under
-docs/prd/, all files under docs/design/, docs/status.md, and docs/qa-report.md
+docs/prd/, all files under docs/design/, docs/status.md, docs/qa-report.md
 (if it exists — every MEDIUM-or-higher bug must become a fix task with
-priority above new feature work). Prioritize in this order:
+priority above new feature work), and docs/eng-backlog.md (if it exists —
+open engineering tasks). Prioritize in this order:
 1. Fix MEDIUM-or-higher bugs from docs/qa-report.md (any kind — BUG,
    REGRESSION, FABRICATION, FLAKY, VISUAL_DEVIATION). Severity drives
    priority, not kind: a [LOW][FABRICATION] is lower than a [HIGH][BUG].
-2. Implement the highest-value unfinished CUJs.
-3. Address LOW bugs from docs/qa-report.md as capacity allows.
+2. `blocking` ENG entries from docs/eng-backlog.md.
+3. The highest-value unfinished CUJs and P1 ENG entries, interleaved —
+   sequenced by pm-review priorities, dependencies, and ENG Ordering
+   constraints.
+4. LOW bugs and P2 ENG entries as capacity allows.
 Never schedule new feature work while any MEDIUM-or-higher bug remains
-unresolved.
+unresolved. Tasks derived from ENG entries must reference the ENG ID in
+the title, copy the entry's Verify check into 'Done when', and honor
+Ordering constraints when grouping.
 Return a summary of what tasks were scheduled and how many parallel groups
 there are."
 ```
@@ -163,6 +174,12 @@ code review checklist (Section 4 of your role definition):
 - Guideline compliance: if any docs/*-guidelines.md files exist, verify
   all changed code complies
 
+For tasks in this iteration derived from docs/eng-backlog.md entries
+(task titles carrying an ENG-NNN ID), run your engineering-task
+verification: confirm the coder's reported Verify evidence (re-run the
+check where cheap), remove completed ENG blocks from docs/eng-backlog.md,
+and flag missing or failing evidence as a Critical Issue.
+
 Fix simple, unambiguous issues directly (unused imports, type annotations,
 hardcoded values → constants). For design-level issues, flag them but do
 not modify the code.
@@ -199,7 +216,14 @@ Execute ALL of your steps including Step 9 (gate enforcement):
 
 Read docs/prd/index.md and active PRDs under docs/prd/ for the CUJ
 acceptance criteria. If any docs/*-guidelines.md files exist, read them
-for the definition of 'done' — apply it strictly."
+for the definition of 'done' — apply it strictly.
+
+Tasks derived from docs/eng-backlog.md entries (ENG-NNN in the title)
+have no CUJ: exclude them from per-CUJ verification — their functional
+gate is the entry's Verify check, confirmed in code review. Your
+responsibility for them is regression coverage only: the full test suite
+must still pass, and any CUJ breakage caused by eng work is a bug like
+any other."
 ```
 
 ### After QA completes:
@@ -249,6 +273,9 @@ read docs/qa-report.md for the engineering-side verdict; produce a
 product-side judgment per CUJ; write docs/pm-review.md following the
 structure in your role definition.
 
+Engineering tasks (ENG-NNN, from docs/eng-backlog.md) are out of scope
+for your review — they have no product intent to judge. Review CUJs only.
+
 You may also flip PRD frontmatter status: active → completed for any
 PRD whose CUJs are all Satisfied in your review. That is the only PRD
 file edit allowed in this phase — do not toggle any per-CUJ markers
@@ -265,8 +292,8 @@ for the next iteration."
 
 If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED`, or Phase 4 retry budget exhausted), use that status and skip the computation. Otherwise compute the verdict deterministically from **both** the QA report and PM's review — no agent call needed:
 
-- **`done`** if QA verdict is `PASS` (or `FAIL` with LOW-only bugs) AND **every in-scope CUJ has PM verdict `Satisfied`** in `docs/pm-review.md`. Both gates must pass.
-- **`continue`** otherwise — either QA found MEDIUM+ bugs (and the Phase 4 inner loop didn't already exit), or PM judged at least one CUJ `Caveats` or `Not done`. The PM review's "Recommended Next-Iteration Priorities" list seeds the next planner.
+- **`done`** if QA verdict is `PASS` (or `FAIL` with LOW-only bugs) AND **every in-scope CUJ has PM verdict `Satisfied`** in `docs/pm-review.md` AND **no `blocking` ENG entry remains open** in `docs/eng-backlog.md` (in scoped mode, count only blocking entries whose `Relates-to` names the target PRD). All gates must pass. Open `P1`/`P2` ENG entries do NOT block `done` — they persist in the backlog for future cycles; that's what the backlog is for.
+- **`continue`** otherwise — QA found MEDIUM+ bugs (and the Phase 4 inner loop didn't already exit), or PM judged at least one CUJ `Caveats` or `Not done`, or a `blocking` ENG entry is still open. The PM review's "Recommended Next-Iteration Priorities" list seeds the next planner.
 
 This two-key gate ensures engineering correctness (QA) and product intent (PM) both sign off before the loop terminates. QA can pass a CUJ that meets every literal acceptance criterion while PM correctly judges it `Caveats` because the impl misses the point of the feature — that's a `continue` signal, not a `done`.
 
@@ -288,6 +315,8 @@ Status: <continue | done | blocked>
 - QA inner loops used: <0-2>
 - CUJs completed this cycle: <list>
 - CUJs remaining: <count>
+- ENG entries completed this cycle: <list of ENG-NNN, or "none">
+- ENG entries open: <count> (<count of blocking>)
 
 ## QA Gate
 - Verdict: <PASS | FAIL>

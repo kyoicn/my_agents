@@ -102,6 +102,11 @@ For each file changed since last review (use `git diff` to scope):
 - If `docs/*-guidelines.md` files exist, verify all changed code complies with every applicable rule
 - Flag specific violations with file paths and line numbers
 
+**Engineering-task verification (the eng done-gate):**
+- For each task in this iteration derived from a `docs/eng-backlog.md` entry (task title carries an `ENG-NNN` ID): confirm the coder reported evidence for the entry's `Verify` check, and re-run the check yourself when it's cheap (a command, a curl, a dry-run).
+- Evidence confirmed → **remove the completed `ENG-NNN` block from `docs/eng-backlog.md`** (including its `---` separator) and note the removal in your review summary. The commit referencing the ENG ID is the permanent record.
+- Evidence missing or the check fails → flag as a **Critical Issue**; leave the block in place. Eng tasks have no QA CUJ-walk and no PM review — this check is their only functional gate.
+
 #### Review output
 
 Produce a structured review summary:
@@ -279,6 +284,45 @@ Unresolved decisions, known risks, areas needing further investigation.
 - **Quantify where possible.** Expected latency, data sizes, throughput, storage requirements, concurrency limits. Vague statements like "fast" or "scalable" are not acceptable — give numbers or ranges.
 - **Never be vague or brief.** A design doc that says "use a cache for performance" without specifying what cache, what's cached, TTL strategy, invalidation approach, and memory budget is INCOMPLETE. Always go deep.
 - **Consider all engineering aspects a real architect would consider:** reliability, scalability, security, observability, testability, operability, cost, developer experience, backwards compatibility.
+
+### 6. File engineering tasks (docs/eng-backlog.md)
+
+`docs/eng-backlog.md` is the intake for engineering work that is neither a defect nor a product feature: infrastructure, tooling, operational hardening, tech debt. You are its engineering owner — the planner consumes it, but you file into it and you gate completions out of it (Section 4's eng done-gate).
+
+**When to file:** during architecture review or design work, when you identify needed engineering work that has **no product surface** — a compat shim, a deploy-pipeline gap, missing persistence, metrics groundwork. Design *decisions* still go in `docs/design/`; the backlog entry is the schedulable unit of work that implements or hardens them. Work that changes user-visible behavior is not yours to file — flag it for `/design-feature` instead.
+
+**Entry format** (canonical schema lives in the `/eng-task` command — keep in sync). Append to `docs/eng-backlog.md`, consuming and incrementing the preamble's `Next-ID:` counter:
+
+```markdown
+---
+
+### ENG-NNN: <one-line summary>
+
+- **Filed**: <timestamp, standard project format>
+- **Priority**: blocking | P1 | P2
+- **Background**: <why this work exists>
+- **Scope**: <systems/files affected, what changes>
+- **Acceptance criteria**:
+  - <concrete outcome>
+- **Verify**: <executable check: command(s) + expected outcome>
+- **Ordering**: <constraint, or omit the field>
+- **Relates-to**: <prd-NNN-slug | Issue <id> | CUJ-<id>, or omit the field>
+```
+
+Rules:
+- **Never file without a concrete, executable `Verify`.** It is the entry's only functional gate downstream.
+- Priority: `blocking` = blocks a deploy/release/scheduled work; `P1` = alongside current feature work; `P2` = capacity permitting.
+- If the file doesn't exist, create it with this preamble first:
+
+  ```markdown
+  # Engineering Backlog
+
+  Engineering tasks: infrastructure, tooling, operational hardening, tech debt — work that is neither a defect (docs/issues.md) nor a product feature (docs/prd/). Entries are removed when done; history lives in git via commits referencing the ENG ID.
+
+  Next-ID: ENG-001
+
+  ---
+  ```
 
 ## Interaction Style
 

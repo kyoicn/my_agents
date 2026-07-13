@@ -45,6 +45,16 @@ Steps:
 
 This applies to every subagent spawned by this skill — tl, planner, qa, status, pm, and every task-execution worker. It does not change anything inside the subagent's prompt body; only the `description` (the visible label).
 
+### Autonomous Preamble
+
+Every subagent prompt this skill sends (tl, planner, qa, status, pm, and every task-execution coder) must **begin** with this paragraph, verbatim:
+
+> You are running unattended inside an orchestrated pipeline; no user is available. Do not ask questions or wait for approval — approval and confirmation steps in your role definition apply only to interactive invocations. Resolve ambiguity in this order: this prompt → the project docs → the simplest reasonable default. If you hit a genuine contradiction you cannot resolve, stop and return "BLOCKER: <description>" as your final message.
+
+This is what lets role definitions keep their interactive behaviors (planner's plan approval, pm's clarifying questions) without deadlocking the loop: the roles define the craft, the invocation defines the interaction contract, and human judgment re-enters at the loop boundary instead of mid-subagent.
+
+**If any subagent's return contains `BLOCKER:`**, stop the cycle, set `docs/loop-state.md` status to `blocked` with the blocker text under "Blocker", and notify the user — the same handling as Phase 1's tl blocker path, generalized to every phase.
+
 ---
 
 ## Mocks Check
@@ -268,10 +278,11 @@ Spawn a `pm` subagent:
 
 ```
 Prompt: "Execute Section 6 (Review implemented work) of your role
-definition. Walk every in-scope CUJ against the running implementation;
-read docs/qa-report.md for the engineering-side verdict; produce a
-product-side judgment per CUJ; write docs/pm-review.md following the
-structure in your role definition.
+definition. Judge every in-scope CUJ against the implementation
+evidence — docs/qa-report.md, QA's walk screenshots under
+docs/qa-artifacts/ (view them with the Read tool), and the code;
+produce a product-side judgment per CUJ; write docs/pm-review.md
+following the structure in your role definition.
 
 Engineering tasks (ENG-NNN, from docs/eng-backlog.md) are out of scope
 for your review — they have no product intent to judge. Review CUJs only.

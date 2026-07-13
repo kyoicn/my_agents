@@ -133,6 +133,12 @@ The discovery, CUJ-shape iteration, AND mock generation are **done** at this poi
 Spawn a `pm` subagent with the route + discovery summary + confirmed CUJ shapes + list of mock files embedded in the prompt. Substitute the bracketed sections with your actual collected content:
 
 ```
+You are invoked non-interactively as the PRD writer (context 2 of
+your role definition) — the design conversation already happened in
+the main thread; no user is available to you. Do not ask questions.
+If the handoff below is contradictory or incomplete, return
+"BLOCKER: <description>" as your final message instead of guessing.
+
 You are executing the PRD-writing phase. Discovery is DONE — do not
 re-ask the user about the problem, value prop, scope, form factor,
 style, or what the CUJs should be. Mocks are ALREADY produced and

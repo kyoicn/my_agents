@@ -12,8 +12,7 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
 1. **Determine the working language** of the project:
    - Read the files under `docs/` and check what language they are written in (e.g., Chinese, English, Japanese, etc.)
    - If the docs consistently use one language, that is the project's working language — write the entire status.md in that same language.
-   - If the docs use mixed languages or you cannot confidently determine a single working language, ask the user to confirm which language to use.
-   - If you cannot ask (non-interactive) and docs are ambiguous, fall back to English.
+   - If the docs use mixed languages or you cannot confidently determine a single working language, use the majority language of the docs; if there is no clear majority, fall back to English.
 
 2. **Gather information** by reading the project thoroughly:
    - **`docs/prd/index.md` and all `docs/prd/prd-NNN-*.md`** — the spec, source of the CUJ list. PRDs no longer carry per-CUJ progress markers; you derive each CUJ's progress below.

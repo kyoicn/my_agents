@@ -229,6 +229,10 @@ that were overwritten.]
 
 ### Format rules (apply to all routes):
 
+- New PRDs (Routes A and B) are created with frontmatter
+  `status: active` — the design conversation that produced this
+  handoff IS the approval. Do not write `draft`; a draft PRD is
+  invisible to /dev-cycle.
 - **Optional brief research**: WebSearch only if a specific spec
   detail (e.g., a competitor pattern, a standard format) is needed
   to make a CUJ concrete. Do NOT redo a discovery-level research

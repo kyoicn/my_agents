@@ -159,12 +159,14 @@ Wait for all agents in the group to complete before moving to the next group. If
 ### Phase 3.5: Merge & Resolve Conflicts
 
 After all groups complete:
-1. Merge each agent's branch into the main branch in group order (Group 1 first, then Group 2, etc.)
-2. Within each group, merge in the order tasks appear in `docs/tasks.md`
-3. If a merge conflict occurs:
+1. Record the pre-merge commit: `PRE_MERGE=$(git rev-parse HEAD)`.
+2. Merge each agent's branch into the main branch in group order (Group 1 first, then Group 2, etc.)
+3. Within each group, merge in the order tasks appear in `docs/tasks.md`
+4. If a merge conflict occurs:
    - Attempt automatic resolution for trivial conflicts (import additions, non-overlapping changes)
    - For non-trivial conflicts, note the conflict in loop-state.md and attempt resolution by reading both changes and combining them
-4. After all merges, run the project's compilation/type-check command (e.g., `npx tsc --noEmit`, `cargo check`, `go build ./...`, `python -m py_compile`) to verify the combined code compiles. If it fails, fix compilation errors before proceeding.
+5. **PRD guard.** Task branches must never touch `docs/prd/` — coders are read-only there, and the only sanctioned PRD edit in this whole cycle is pm's status flip in Phase 6. Check: `git diff --name-only "$PRE_MERGE" HEAD -- docs/prd/`. If anything is listed, revert it (`git checkout "$PRE_MERGE" -- docs/prd/ && git commit -m "revert: strip PRD edits from task branches (coders are read-only on docs/prd/)"`), identify which branch introduced it, and log the violation + task name in `docs/loop-state.md` — spec drifting to match implementation is exactly what this pipeline exists to prevent.
+6. After all merges, run the project's compilation/type-check command (e.g., `npx tsc --noEmit`, `cargo check`, `go build ./...`, `python -m py_compile`) to verify the combined code compiles. If it fails, fix compilation errors before proceeding.
 
 ---
 

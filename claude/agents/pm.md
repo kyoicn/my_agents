@@ -174,6 +174,8 @@ Status transitions:
 - `completed → deprecated` — implemented feature later removed
 - `completed → active` — feature needs rework or expansion (add new CUJs)
 
+**Initial status**: PRDs produced through a `/design-feature` session are born `active` — the design conversation that produced them *is* the user's approval. Reserve `draft` for specs written outside a design session (e.g., a speculative PRD awaiting sign-off in a manual `/user:pm` conversation); `/dev-cycle` only processes `active` PRDs, so a feature left in `draft` is invisible to the loop.
+
 ### How the two tiers work together
 
 - `docs/prd/index.md` stays navigable as the project grows — it's a table of contents, not the full spec

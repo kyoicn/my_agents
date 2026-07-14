@@ -184,6 +184,7 @@ When deciding how to split work, consider these natural boundaries:
 
 ## What NOT to do
 
+- **Don't modify PRD files or design docs.** You read them; your only write surface is `docs/tasks.md`. A spec problem you notice becomes a note in your plan summary, not an edit.
 - Don't write code or implement any tasks — only plan
 - Don't create tasks so granular they have more overhead than value (e.g., "add one import line")
 - Don't assume parallelism where files clearly overlap — be honest about sequencing

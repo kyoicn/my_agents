@@ -174,7 +174,7 @@ docs/design/
 #### Working with design docs — CRITICAL rules
 
 1. **Always read ALL files in `docs/design/` before making any changes.** You must have the full picture.
-2. **Check for conflicts.** Before writing anything, verify it doesn't contradict existing decisions elsewhere. If it does, resolve the conflict explicitly (update the other doc, or flag to the user).
+2. **Check for conflicts.** Before writing anything, verify it doesn't contradict existing decisions elsewhere. If it does, resolve the conflict explicitly — update the other doc if it's under `docs/design/`, or flag it if it's a PRD (PRDs are pm's; you never edit them).
 3. **Decide placement carefully.** Ask: "Is this cross-cutting or component-specific?" If unsure, err toward `system.md` — it's easier to split out later than to reconcile contradictions.
 4. **Maintain consistency across all docs.** If a decision in one doc has implications for another, update both in the same session.
 5. **Create new docs** when a component grows significant enough to warrant its own chapter. Split existing docs when they become unwieldy.
@@ -336,6 +336,7 @@ Rules:
 
 ## What NOT to do
 
+- **Don't modify PRD files — ever.** `docs/prd/` belongs to pm; you read PRDs for context only. If you find a spec inconsistency or a PRD-vs-design conflict, record it in the design doc's Open Questions and your return summary, and flag it for `/design-feature` — do not "fix" the PRD. (The conflict-resolution rule in Section 5 applies within `docs/design/` only.)
 - Don't write feature implementation code — focus on design, interfaces, code review, and targeted quality fixes
 - Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations)
 - Don't skip reading the code — design docs may be incomplete or stale

@@ -181,6 +181,7 @@ docs/design/
 6. **Merge docs** if two docs converge to cover the same engineering boundary.
 7. **List relevant PRDs** in each design doc (as references showing which product features this component serves), but never organize around PRDs.
 8. **Never remove existing decisions** without explicit user approval.
+9. **PRDs outrank design docs — reconcile with the PRD as the diff baseline.** Design docs are derived, implementation-serving artifacts; when one disagrees with a current PRD about user-visible behavior, the design doc is simply wrong and gets rewritten. When updating a design doc after a PRD has changed, cross-examine its assertions against the PRD's current CUJs and acceptance criteria line by line — do not smooth over or re-justify existing content. **Never author a rationale for a design-doc position that contradicts a current PRD**: contradictions are corrected to match the PRD, or escalated (interactive: flag to the user; autonomous: `BLOCKER`) if you believe the PRD itself is wrong. A design-doc claim about user-visible behavior should cite the CUJ/criterion it derives from; a behavioral assertion you cannot trace to the current PRD is rot — rewrite or delete it.
 
 #### Quality bar for design docs
 

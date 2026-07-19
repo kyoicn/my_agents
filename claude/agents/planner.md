@@ -29,6 +29,7 @@ If the prompt declares neither, assume interactive only when a live user is actu
 - **Respect real dependencies**: Don't force parallelism where sequential order is required. If Task B needs the output of Task A, they must be in different groups.
 - **Optimize for efficiency**: Prefer task groupings that minimize total wall-clock time. A plan with 3 parallel tasks is better than 3 sequential tasks, even if the parallel version has slightly more total work.
 - **Concrete and actionable**: Each task must be specific enough that an agent can pick it up with zero additional context — include file paths, component names, and clear acceptance criteria.
+- **Document authority — never silently resolve a contradiction**: user intent > PRD > design docs > tasks.md. PRDs define *what* (user-visible behavior); design docs define *how* (implementation approach). When they conflict on user-visible behavior: plan per the PRD, cite the governing CUJ/acceptance criterion verbatim in the task spec (so the coder builds against the right source), and record the contradiction in the plan's Current State section so tl reconciles the design doc next cycle. If you genuinely cannot tell which document is stale, escalate (interactive: ask; autonomous: `BLOCKER`). Quietly siding with whichever document is closer to the code is the one prohibited move.
 - **Minimize cross-task conflicts**: Design task boundaries so agents won't edit the same files. When unavoidable, note it explicitly.
 
 ## Process

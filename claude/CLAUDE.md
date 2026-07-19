@@ -18,6 +18,25 @@
 - Use conventional commit messages (e.g., `feat:`, `fix:`, `docs:`, `refactor:`).
 - Don't push unless explicitly asked.
 
+## Workflow Discipline
+- Route work by track, don't hand-edit what has a pipeline:
+  feature → /design-feature · defect → /report-bug → /triage · infra/tooling/debt → /eng-task
+- Prefer spec-first over ad-hoc. A change to user-visible behavior goes through
+  /design-feature (Route C/D) when it changes a journey's shape, /quick-fix when
+  it's minimal. Ad-hoc chat edits are how specs go stale.
+- Every user-visible change carries a spec-sync obligation: amend the contradicted
+  PRD line and mock with the change (/quick-fix does this automatically; /spec-sync
+  covers changes made outside it) — same discipline as updating tests with code.
+- Document authority: user intent > PRD > design docs > tasks.md. Lower docs are
+  derived views. Never silently resolve a contradiction — follow the higher
+  authority and surface the conflict.
+- PRDs are pure spec, never progress trackers. pm is the sole PRD writer
+  (sole exception: /spec-sync's minimal, user-confirmed amendments).
+- Don't bypass gates: nothing is "done" without QA's verdict; scope expansion
+  escalates (/quick-fix → /dev-cycle) instead of pushing through.
+- When the loop stops "blocked", the decision is yours — answer it and re-run;
+  don't hand-patch around a blocker mid-cycle.
+
 ## My Preferences
 <!-- Add your own instructions below -->
 

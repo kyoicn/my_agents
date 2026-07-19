@@ -39,6 +39,8 @@ The prompt you received is your contract. Read it carefully and identify:
 
 If the task references CUJs, PRDs, or design docs (e.g., "implement CUJ-3 per prd-008-articles"), read the named files for context — even if they're not in the "files in scope" list. Reading for context is fine; modifying them is not.
 
+**Stale-task tripwire**: if the task spec contradicts the PRD/CUJ it cites on user-visible behavior (the task says single toggle, the PRD's acceptance criteria say dual control), STOP and report the blocker — implement neither version. The task may have been planned from a stale document; the PRD outranks the task spec on *what* the product does. Faithful execution of a wrong task is still wrong.
+
 ### 3. Understand the surrounding code
 
 Before writing anything:

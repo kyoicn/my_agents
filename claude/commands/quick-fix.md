@@ -64,7 +64,16 @@ If a dev server can be started and the fix is UI-visible or API-observable:
 
 **For an ENG entry, additionally execute the entry's `Verify` check exactly as written** and confirm the expected outcome. Report the command and its output to the user — that evidence is the entry's done-gate. If the check fails, the task is not done; do not proceed to commit.
 
-### 6. Commit
+### 6. Spec-sync check
+
+Compare the post-fix behavior against what the spec asserts (the affected CUJ's Journey Steps, acceptance criteria, and mocks — the issue block's CUJ field tells you where to look):
+
+- **Fix restored spec compliance** (the normal case — a bug is a deviation from spec, so the fix moves behavior *toward* it): nothing to sync. Skip silently.
+- **Fix moved behavior *away* from the current spec** (a user-directed change — "make the button green" — that the PRD/mock still contradicts): run the spec-sync procedure from `/spec-sync` scoped to exactly this change. Ask the sync-or-revert question, apply the minimal amendments to the contradicted PRD lines and mock tokens, and include them in this fix's commit with the `Spec-sync:` trailer. If the amendment can't stay minimal (the change alters the journey's shape), the spec work escalates to `/design-feature` Route D — ship the fix, tell the user the spec needs a design pass.
+
+This check is mandatory — skipping it is how specs go stale and how later cycles revert intentional changes.
+
+### 7. Commit
 
 Commit with a conventional commit message:
 ```
@@ -81,7 +90,7 @@ For an ENG entry, reference the ENG ID instead (this is the permanent record onc
 <one-line explanation of what was done and the Verify outcome>
 ```
 
-### 7. Clean up the issue + its attachments
+### 8. Clean up the issue + its attachments
 
 If the issue came from `docs/issues.md`:
 
@@ -114,6 +123,7 @@ Do not push through a large fix just because you started. It's better to stop ea
 - Don't modify PRD files or design docs — the spec isn't wrong, the code is
 - Don't skip running tests
 - Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
+- Don't skip the spec-sync check (Step 6) when a fix changes user-visible behavior away from the spec — unsynced drift is what makes later cycles revert intentional changes
 - Don't leave stale entries in docs/issues.md after fixing
-- Don't leave orphaned screenshots in docs/issues-attachments/ — Step 7 deletes them along with the issue block
+- Don't leave orphaned screenshots in docs/issues-attachments/ — Step 8 deletes them along with the issue block
 - Don't commit screenshots from docs/issues-attachments/ — the directory should already be in .gitignore (created by /report-bug); never bypass that

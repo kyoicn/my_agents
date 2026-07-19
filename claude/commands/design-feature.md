@@ -301,6 +301,15 @@ After it returns, verify the status table reflects the route's intent.
 
 Print a single concise summary that truthfully reflects what was written, extended, refined, or reset. Use the `route` + `files_created` + `files_modified` + `cuj_set` returned by PM in Phase 1, plus the mock paths from Phase 0.5.
 
+**For Routes C and D — stale-design-doc breadcrumb.** The spec just changed for existing feature territory, so design docs referencing it are now stale until the next `/dev-cycle` Phase 1 reconciles them (the PRD is the diff baseline there). Check which: `grep -rl "CUJ-<id>" docs/design/` for each changed CUJ-ID (plus a grep for the feature's slug). Append to the route summary:
+
+```
+Heads-up: <design-doc files, or "no design docs"> reference the changed CUJs —
+stale until the next /dev-cycle reconciles them against the updated PRD (PRD wins).
+```
+
+This costs one grep and survives into the next cycle via the summary; without it, the disagreement window is invisible until an agent trips on it.
+
 ### Route A (bootstrap brand-new project):
 
 ```

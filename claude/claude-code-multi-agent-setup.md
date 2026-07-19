@@ -52,6 +52,7 @@ This setup creates a team of specialized AI agents that collaborate in an autono
                                                       ├──► /dev-cycle  (large)
                                                       ├──► /design-feature  (spec-gap — feature needs design)
                                                       ├──► ask user        (spec-conflict — report vs PRD)
+                                                      ├──► /spec-sync      (spec-stale — code is right, doc is stale)
                                                       └──► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
 ```
 
@@ -93,7 +94,8 @@ Each row links to the canonical command definition.
 | [`/dev-cycle`](commands/dev-cycle.md) | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict. Use with `/loop /dev-cycle` for continuous operation. |
 | [`/report-bug`](commands/report-bug.md) | Conversational bug intake with screenshot support (clipboard via `pngpaste` → file path → interactive `screencapture` → skip). Writes an h3 block to `docs/issues.md`; screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
 | [`/triage`](commands/triage.md) | Diagnose issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or freeform description). Appends a structured `Triage` field — scope, root cause, files, recommended action, risk. |
-| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — refused if the entry has an Ordering constraint). Escalates if scope expands mid-fix. |
+| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — refused if the entry has an Ordering constraint). Escalates if scope expands mid-fix. Runs the spec-sync check after every fix (Step 6). |
+| [`/spec-sync`](commands/spec-sync.md) | Reconcile PRDs/mocks with intentional out-of-band changes — minimal, user-confirmed, docs-only amendments to the exact contradicted lines. Scoped by construction (description / CUJ / commit range / recent delta); `--all` is an inventory-first sweep of statically-checkable assertions with per-CUJ commits. The sole exception to pm's PRD ownership. |
 | [`/eng-task`](commands/eng-task.md) | Conversational intake for engineering tasks (infrastructure, tooling, operational hardening, tech debt) — the third track alongside defects and features. Writes an h3 block to `docs/eng-backlog.md` with a **mandatory mechanically executable `Verify` check** (no Verify → no entry), Priority (`blocking`/`P1`/`P2`), and optional Ordering constraints. Owns the canonical classification rule for the three tracks. Offers the `/quick-fix ENG-NNN` fast path for small, unconstrained entries. |
 | [`/gorilla-test`](commands/gorilla-test.md) | Manual-only adversarial exploratory test session against the running product. `--time <30m\|1h\|...>` (default 30m, max 4h), optional `--path </articles>`. Files every finding to `docs/issues.md`; per-session output in `docs/gorilla/<session-id>/`. |
 | [`/organize-project`](commands/organize-project.md) | One-time-per-project skill to retrofit an existing project into the canonical pattern. Audits scattered docs broadly, reconciles per-doc with user (migrate/adopt/preserve/ignore), scaffolds missing infrastructure, derives design docs from code, backfills PRDs that describe what's actually built. **Idempotent**. |
@@ -205,6 +207,7 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 15. **Four-way role split: design / decompose / implement / verify**: `tl` designs (read code → propose architecture → maintain `docs/design/`); `planner` decomposes (read PRDs + design + status → propose tasks → write `docs/tasks.md`); `coder` implements (read task → write code + unit tests → commit); `qa` verifies (read PRDs + code + running product → write integration/E2E tests → produce `docs/qa-report.md` with gate authority). No role does another's work. tl doesn't write feature code; planner doesn't pick the architecture; coder doesn't write E2E tests; qa doesn't write unit tests. Each role's "What NOT to do" list enforces the boundary, so the orchestrator has clear delegation rules and any new requirement routes to exactly one owner.
 16. **Roles define the craft; invocations define the interaction contract**: agent definitions keep their interactive behaviors (planner's plan approval, pm's clarifying-question cadence, tl's discuss-first rule) because those are good behavior when a human is driving — but they are explicitly scoped to interactive invocations. Orchestrators (`/dev-cycle`, `/design-feature` Phase 1) prepend a standard **autonomous preamble** to every subagent prompt: no user is available, don't ask or wait for approval, resolve ambiguity prompt → docs → sensible default, and return `BLOCKER: <description>` for genuine contradictions. The orchestrator handles any BLOCKER by setting `docs/loop-state.md` to `blocked` and stopping — so human judgment re-enters at the loop boundary, where a human actually exists, instead of deadlocking mid-subagent. Two structural consequences: `planner` has an explicit Modes section (approval gates interactive-only; in the loop, the QA and PM gates *are* the approval), and `pm` declares its three execution contexts (design partner / PRD writer / reviewer) — the conversational design rules bind the `/design-feature` orchestrator that runs them in the main thread, not the non-interactive subagent. Relatedly, PM review is **evidence-based**: pm has no browser tools, so its product-side verdict is grounded in QA's report, QA's walk screenshots under `docs/qa-artifacts/` (viewed multimodally), and the code — never phrased as if pm operated the product.
 17. **Three intake tracks: defect / feature / engineering task**: work that is neither broken-from-the-user's-perspective nor a product feature — infrastructure, tooling, operational hardening, tech debt — has its own intake (`/eng-task` → `docs/eng-backlog.md`) instead of being forced into `issues.md` or a PRD. The backlog is deliberately a *backlog*, not an inbox: entries sit prioritized (`blocking`/`P1`/`P2`) until the planner schedules them, unlike issues.md which triage drains. Three invariants keep it from becoming a dumping ground: (a) every entry carries a **mechanically executable `Verify` check** filed at intake — since eng tasks bypass QA's CUJ walks and PM review, the Verify (run by coder, confirmed by tl at code review) is their entire functional gate; (b) `tl` owns the track end-to-end — files entries during architecture review, gates completions out at code review; (c) priority is a cross-source ladder the planner enforces: MEDIUM+ QA bugs > `blocking` ENG > CUJs interleaved with `P1` ENG > LOW bugs and `P2` ENG. `/dev-cycle` won't report `done` while a `blocking` entry is open; open P1/P2 entries persist across cycles by design.
+18. **Document authority with a human apex: user intent > PRD > design docs > tasks.md**: lower documents are derived views, and *silently resolving* a contradiction is prohibited everywhere — `planner` plans per the PRD, cites the governing criterion in the task spec, and records the conflict; `tl` reconciles design docs with the changed PRDs as the diff baseline (dev-cycle Setup computes the changed-PRD list) and never authors a rationale for stale design-doc content; `coder` stops with a BLOCKER when a task spec contradicts the PRD it cites; `qa` takes acceptance criteria from PRDs only. The hierarchy is topped by **user intent** because a PRD is authoritative only as the serialization of what the user decided — so an ad-hoc user-directed change ("make the button green") outranks the PRD and creates a **spec-sync obligation** rather than a conflict: the contradicted PRD lines and mock tokens get minimal, user-confirmed, docs-only amendments (`/quick-fix` runs the check automatically after every fix; `/spec-sync` covers changes made outside it; triage's `spec-stale` classification routes deliberate deviations there). This closes both failure directions at once: stale design docs can no longer override fresh PRDs (the post-mortem case), and stale PRDs can no longer trigger revert wars against intentional changes (the green-button case). The sole carve-out to pm's PRD ownership is spec-sync's amendment power — user-present, line-scoped, commit-trailed.
 
 ---
 
@@ -339,6 +342,25 @@ These are project-agnostic instructions for the main agent. Merge with any exist
 ## Git
 - Use conventional commit messages (e.g., `feat:`, `fix:`, `docs:`, `refactor:`).
 - Don't push unless explicitly asked.
+
+## Workflow Discipline
+- Route work by track, don't hand-edit what has a pipeline:
+  feature → /design-feature · defect → /report-bug → /triage · infra/tooling/debt → /eng-task
+- Prefer spec-first over ad-hoc. A change to user-visible behavior goes through
+  /design-feature (Route C/D) when it changes a journey's shape, /quick-fix when
+  it's minimal. Ad-hoc chat edits are how specs go stale.
+- Every user-visible change carries a spec-sync obligation: amend the contradicted
+  PRD line and mock with the change (/quick-fix does this automatically; /spec-sync
+  covers changes made outside it) — same discipline as updating tests with code.
+- Document authority: user intent > PRD > design docs > tasks.md. Lower docs are
+  derived views. Never silently resolve a contradiction — follow the higher
+  authority and surface the conflict.
+- PRDs are pure spec, never progress trackers. pm is the sole PRD writer
+  (sole exception: /spec-sync's minimal, user-confirmed amendments).
+- Don't bypass gates: nothing is "done" without QA's verdict; scope expansion
+  escalates (/quick-fix → /dev-cycle) instead of pushing through.
+- When the loop stops "blocked", the decision is yours — answer it and re-run;
+  don't hand-patch around a blocker mid-cycle.
 
 ## My Preferences
 ## Execute Tasks

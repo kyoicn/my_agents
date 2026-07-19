@@ -18,6 +18,8 @@ Next, read `docs/loop-state.md` if it exists to understand the current iteration
 
 Read `docs/prd/index.md`, all files under `docs/design/`, and `docs/eng-backlog.md` (if it exists — open engineering tasks; `blocking` entries factor into planning and the final verdict) to orient yourself.
 
+**Determine which PRDs changed since the last cycle** (they drive Phase 1's design-doc reconciliation): `PRD_BASE=$(git log -n1 --format=%H -- docs/loop-state.md 2>/dev/null)`; if set, `CHANGED_PRDS=$(git diff --name-only "$PRD_BASE" HEAD -- docs/prd/)` plus any uncommitted changes (`git diff --name-only HEAD -- docs/prd/`). If no marker exists (first cycle) or the computation fails, treat **all active PRDs** as changed — over-reconciling is safe, missing a change is not.
+
 ### Guidelines Discovery
 
 Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `*-guidelines.md` files exist, read all of them before proceeding — they contain mandatory development and process rules that apply to every phase of this cycle. Store the list of discovered file paths and pass them to every subagent prompt below. If no guideline files exist, skip this step and proceed normally.
@@ -91,7 +93,19 @@ Spawn a `tl` subagent:
 
 ```
 Prompt: "Review the current project state and update docs/design/.
-Focus on: are there design gaps relative to the PRDs? Are there
+
+FIRST — reconcile design docs against changed PRDs. These PRD files
+changed since the last cycle: [insert CHANGED_PRDS, or 'all active
+PRDs' on the first cycle]. For each, cross-examine every design doc
+that touches the same surface, line by line, with the PRD as the diff
+baseline: the PRD outranks design docs on user-visible behavior, so
+rewrite or delete any design-doc assertion that contradicts the
+current CUJs/acceptance criteria. Never re-justify or author a
+rationale for existing design-doc content that conflicts with the
+PRD — correct it, or return BLOCKER if you believe the PRD itself
+is wrong.
+
+Then: are there design gaps relative to the PRDs? Are there
 design decisions that need to be made before the next round of
 implementation? Read docs/prd/index.md, active PRDs under docs/prd/,
 all files under docs/design/, docs/status.md, and the codebase.

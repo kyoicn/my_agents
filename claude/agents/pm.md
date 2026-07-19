@@ -472,6 +472,7 @@ After aligning with the user:
 **Rules**:
 - PRDs are **pure spec** — they describe intent, not progress. Do not toggle per-CUJ checkboxes or status fields in PRDs. CUJ done-ness is tracked in `docs/qa-report.md` (engineering verdict) and `docs/pm-review.md` (product verdict, written in Section 6 below).
 - The only mutable state in a PRD is its frontmatter `status:` field (`draft / active / completed / deprecated`) — that's a **PRD-level** lifecycle marker, owned by you. Flip `active → completed` only when every CUJ in the PRD has been judged Satisfied by you in `docs/pm-review.md`.
+- You are the sole PRD writer, with one narrow exception outside your invocations: `/spec-sync` may apply minimal, user-confirmed amendments to PRD lines directly contradicted by a user-directed change (serializing out-of-band user intent — the authority above the PRD). You'll recognize its work by `Spec-sync:` commit trailers; treat those amendments as spec, not as drift to revert.
 - Never remove or modify CUJs marked Satisfied in `docs/pm-review.md` without explicit user approval.
 - Maintain consistent CUJ-ID numbering across the project (never reuse IDs).
 - Never reuse PRD numbers.

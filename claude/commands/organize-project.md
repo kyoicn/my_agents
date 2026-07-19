@@ -144,6 +144,16 @@ Skip steps for anything already present. Apply only the missing pieces.
    ```
    Don't duplicate existing lines.
 
+5. **Project `CLAUDE.md` pointer** — ensure the project's `CLAUDE.md` contains this two-line pointer (create the file with just these lines if it doesn't exist; append the section if it exists without one):
+   ```markdown
+   ## Workflow
+   This project follows the multi-agent workflow (agents/commands deployed globally
+   via the setup repo's `claude/deploy.sh`). Route work through /design-feature,
+   /report-bug → /triage, and /eng-task; practices live in the global CLAUDE.md
+   ("Workflow Discipline").
+   ```
+   **Do NOT copy the practice rules themselves into the project** — they live in the global `CLAUDE.md` as the single source. A copied ruleset goes stale the next time the setup evolves, and a stale local copy loaded alongside a fresh global one is exactly the stale-doc-overrides-fresh-spec failure this setup guards against.
+
 After this phase, print a one-line summary of what was created vs preserved.
 
 ## Phase 3: Derive design docs via the `tl` agent

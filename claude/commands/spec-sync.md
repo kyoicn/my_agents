@@ -18,6 +18,7 @@ A PRD is authoritative because it records what the user decided. When the user c
 |---|---|
 | `/spec-sync "<description>"` (e.g. `"save button is now green"`) | The described change → the CUJ(s) it plausibly touches → those CUJs' PRD sections + mocks. |
 | `/spec-sync CUJ-<id>` | That CUJ's spec + mocks vs the current implementation of that journey's surface. |
+| `/spec-sync prd-NNN` (e.g. `prd-000`, or the full filename) | Every CUJ in that one PRD — a per-PRD sweep using the `--all` machinery scoped down: inventory + count first when findings span multiple CUJs, statically-checkable assertions only, one commit per CUJ. |
 | `/spec-sync <commit-range>` (e.g. `HEAD~3..`) | User-visible changes in that range → mapped CUJs → their sections + mocks. |
 | `/spec-sync` (bare) | Changes since the last sync marker: `git log -n1 --format=%H -- docs/loop-state.md` (end of last cycle), else the last 10 commits. User-visible deltas only. |
 | `/spec-sync --all` | **Inventory-first sweep** — see its own section below. Never run this scope without the inventory confirmation. |
@@ -56,8 +57,9 @@ For one-time spec-debt cleanup (adopting the discipline late, or after a stretch
 1. **Sweep and inventory before touching anything.** Walk active PRDs CUJ by CUJ; for each, check **statically-checkable assertions only** — copy strings, labels, colors, layout classes readable from mocks and component source. Build the drift inventory and print it with costs up front:
    > Found 23 checkable assertion mismatches across 9 CUJs (~15 files to read). 11 behavioral assertions can't be checked statically — listed at the end for the next QA walk. Proceed CUJ-by-CUJ?
 2. **Get confirmation, then process per CUJ** using the procedure above — one sync-or-revert pass per CUJ, **one commit per CUJ** so a partial run is durable and resumable.
-3. **Behavioral assertions are out of bounds.** Timing, network behavior, multi-step flows — anything requiring a running product — goes in a "needs QA walk" list at the end, never amended on guesswork. Do not fabricate verification.
-4. **Know when to hand off.** If the inventory shows drift concentrated in journey *shapes* rather than tokens, say so and recommend the honest full-project tool instead: run `/dev-cycle` (QA walks every CUJ in a real browser and produces the authoritative deviation list), then scoped spec-syncs for the deviations the user declares intentional.
+3. **Unimplemented CUJs are not drift** (applies to every sweep scope: `CUJ-<id>`, `prd-NNN`, `--all`). For each assertion, distinguish three states: *implemented and matching* (no finding), *implemented differently* (drift — sync-or-revert), and *no implementation found* (**skip — never amend**). The PRD is supposed to lead the code; absence carries no intent signal. Cross-check `docs/status.md`'s Impl column: `not started`/`in progress` → expected, list the CUJ under "unimplemented — skipped" in the inventory; `merged` but you can't locate the implementation → that's a mapping failure or a fabrication signal — surface it as a finding for the next QA walk, and still don't touch the spec.
+4. **Behavioral assertions are out of bounds.** Timing, network behavior, multi-step flows — anything requiring a running product — goes in a "needs QA walk" list at the end, never amended on guesswork. Do not fabricate verification.
+5. **Know when to hand off.** If the inventory shows drift concentrated in journey *shapes* rather than tokens, say so and recommend the honest full-project tool instead: run `/dev-cycle` (QA walks every CUJ in a real browser and produces the authoritative deviation list), then scoped spec-syncs for the deviations the user declares intentional.
 
 ## What NOT to do
 
@@ -66,5 +68,6 @@ For one-time spec-debt cleanup (adopting the discipline late, or after a stretch
 - Don't add, remove, or restructure CUJs, and don't touch PRD frontmatter `status` — shape changes are `/design-feature` Route D; lifecycle is pm's.
 - Don't amend without the user's sync-or-revert confirmation — the question is also the tripwire that catches accidental spec violations.
 - Don't amend behavioral assertions you can't verify statically — route them to a QA walk.
+- Don't amend or delete spec for unimplemented CUJs — no code is not a contradiction; the spec is allowed (expected!) to be ahead of the implementation.
 - Don't run `--all` without printing the inventory and getting confirmation first.
 - Don't batch multiple CUJs into one commit in `--all` mode — per-CUJ commits keep partial runs resumable.

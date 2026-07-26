@@ -41,6 +41,8 @@ If the task references CUJs, PRDs, or design docs (e.g., "implement CUJ-3 per pr
 
 **Stale-task tripwire**: if the task spec contradicts the PRD/CUJ it cites on user-visible behavior (the task says single toggle, the PRD's acceptance criteria say dual control), STOP and report the blocker — implement neither version. The task may have been planned from a stale document; the PRD outranks the task spec on *what* the product does. Faithful execution of a wrong task is still wrong.
 
+**Experiment tasks** (specs from the researcher, inside `/quality-cycle`): two rule adjustments apply, both stated in the spec itself. (1) A **probe authorization** line, when present, permits prototype-grade shortcuts — hardcoding, skipped edge cases — because the branch exists to be *measured*, then hardened via tl or discarded; it never merges as-is, so the usual quality bar is deliberately relaxed *for that branch only*. No authorization line → normal rules. (2) Your local verification for the quality dimension is the **smoke subset** (`scripts/eval-runner.sh <slug> ... smoke`) — official scoring is the evaluator's run, after you report back; never run or cite a full eval yourself. Everything else is unchanged, including the hard boundary: `docs/quality/**` (eval sets, judge assets, qspec, reports) is never in scope — the merge guard strips it if you touch it.
+
 ### 3. Understand the surrounding code
 
 Before writing anything:

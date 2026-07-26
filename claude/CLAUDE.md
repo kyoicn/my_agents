@@ -21,6 +21,10 @@
 ## Workflow Discipline
 - Route work by track, don't hand-edit what has a pipeline:
   feature → /design-feature · defect → /report-bug → /triage · infra/tooling/debt → /eng-task
+  · graded output quality → /design-quality (calibrate the bar) → /quality-cycle (improve toward it)
+- Quality is never vibe-fixed: complaints about how good generated output is triage as
+  scope=quality and route to the quality track — one bad example becomes an eval case,
+  not a quick-fix.
 - Prefer spec-first over ad-hoc. A change to user-visible behavior goes through
   /design-feature (Route C/D) when it changes a journey's shape, /quick-fix when
   it's minimal. Ad-hoc chat edits are how specs go stale.

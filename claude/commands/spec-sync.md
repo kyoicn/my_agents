@@ -50,6 +50,8 @@ A typical scoped run reads one diff, one PRD's relevant sections, and 1–3 mock
 
 This is the **sole exception** to "pm is the only PRD writer": minimal amendments, to lines directly contradicted by a user-directed change, confirmed by the user in-session, recorded in the commit. Nothing broader.
 
+**qspecs are in jurisdiction the same way** (`docs/quality/<slug>/qspec.md`, same pm-ownership carve-out): when the user directs a change to the bar itself — "actually, 3 sentences max," "drop the p10 target to 2.5" — amend the specific threshold/anchor line, user-confirmed, with the trailer. Two qspec-specific rules: statistical assertions are **not** statically checkable, so sweep modes never audit qspec-vs-reality (that's the evaluator's job — route "is the bar met?" questions there); and any amendment touching dimensions, anchors, or the agreement threshold makes the judge stale — end by noting "judge recalibration required before the next verdict" so `/quality-cycle`'s Q0 catches it.
+
 ## `--all` mode — inventory first, CUJ by CUJ, honest about limits
 
 For one-time spec-debt cleanup (adopting the discipline late, or after a stretch of ad-hoc work). Not for routine use — routine is the scoped modes.

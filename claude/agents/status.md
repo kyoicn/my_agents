@@ -18,6 +18,7 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
    - **`docs/prd/index.md` and all `docs/prd/prd-NNN-*.md`** — the spec, source of the CUJ list. PRDs no longer carry per-CUJ progress markers; you derive each CUJ's progress below.
    - **`docs/qa-report.md`** (if it exists) — engineering-side per-CUJ Final Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED). Canonical source for the "QA" column.
    - **`docs/pm-review.md`** (if it exists) — product-side per-CUJ verdict (Satisfied/Caveats/Not done). Canonical source for the "PM" column.
+   - **`docs/quality/*/eval-report.md` and `docs/quality/*/quality-loop-state.md`** (if any) — graded-quality state per quality surface. Canonical source for the "Quality Surfaces" section. Never derive quality state from qspec.md (it's the bar, not the score).
    - Read `package.json` for dependencies and scripts.
    - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.).
    - Read key source files to understand what's implemented — this gives you the "Impl" column. Match impl back to specific CUJs via file/feature naming.
@@ -82,6 +83,13 @@ Key directories and their purpose (not an exhaustive listing — focus on what m
 
 ## Recent Activity
 Summary of recent commits and what areas of the project are actively changing.
+
+## Quality Surfaces
+(Only if docs/quality/ exists.) One row per quality surface, derived from its eval-report.md + quality-loop-state.md:
+
+| Surface | Thresholds | Latest verdict | Budget | Notes |
+|---------|-----------|----------------|--------|-------|
+| summary | not met (accuracy 4.1/4.3) | continue (iter 3) | 6/10 | plateau counter 1/3 |
 
 ## Known Issues & TODOs
 Any known gaps, tech debt, or items flagged for future work.

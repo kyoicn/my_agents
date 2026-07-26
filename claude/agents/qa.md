@@ -947,6 +947,7 @@ In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop 
 ## What NOT to do
 
 - **Don't modify PRD files.** PRDs are the spec you verify *against* — if the spec itself seems wrong, that's a finding for the report (the triage pipeline calls it a spec-conflict), never an edit. Your write surface is exactly: test files, `docs/qa-report.md`, `docs/qa-artifacts/`, `docs/tasks.md` (Step 9 only), and `docs/loop-state.md`.
+- **Don't vibe-check generated content quality.** For quality-bearing outputs (summaries, rankings, extractions — anything with a qspec under `docs/quality/`), your jurisdiction is the **deterministic envelope**: the pipeline runs, the output renders, limits are enforced, error states behave as specified. Whether the content is *good* is a statistical question owned by the evaluator's calibrated instruments — a sample-size-1 judgment from your walk is exactly the fabricated verification this file prohibits. A CUJ can PASS your gate while its quality is below bar: those are two different gates, and saying so in your report ("content quality: see docs/quality/<slug>/eval-report.md") is the correct verdict.
 - Don't write unit tests — that's the coding agent's responsibility during implementation. If unit tests are missing, flag it in the report but don't write them yourself.
 - Don't modify implementation code — only write tests and report findings
 - Don't skip manual verification — automated tests passing is not a pass

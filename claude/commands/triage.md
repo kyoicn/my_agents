@@ -44,7 +44,7 @@ Quickly orient yourself:
 
 **d) Assess scope**
 
-Classify as one of six scopes:
+Classify as one of seven scopes:
 
 | Scope | Criteria | Resolution path |
 |-------|----------|-----------------|
@@ -54,6 +54,7 @@ Classify as one of six scopes:
 | **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` (Route C extend or Route D refine — let the orchestrator decide) |
 | **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → `/design-feature` Route D to refine; report wrong → close as invalid) |
 | **spec-stale** | Implementation deviates from the PRD *deliberately* — git history shows a user-directed change (e.g. a `fix:` commit from a /quick-fix or ad-hoc session) newer than the spec text. The code is right; the doc is stale. | `/spec-sync` (docs-only — amend the contradicted PRD lines/mocks; no code change) |
+| **quality** | The deterministic behavior is correct, but *how good* the output is falls below bar — statistically or on a category ("summaries are bad on listicles"). Not a code defect, not a stale spec: a quality gap on a surface with (or needing) a qspec under `docs/quality/`. | `/quality-cycle <slug>` — and hand the complaint's example(s) to the evaluator as eval-set case candidates. No qspec exists yet → `/design-quality` first. Never "fix" quality by vibe in a quick-fix. |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -64,6 +65,7 @@ Key questions for scope assessment:
 - Is this actually a missing feature rather than a bug? If no CUJ defines the expected behavior, it's a spec-gap.
 - Does the reported "expected behavior" directly contradict what the PRD specifies? If so, it's a spec-conflict — don't assume either side is correct.
 - Does the implementation deviate from the PRD because someone *chose* that? Check `git log` on the files involved: a user-directed change (fix/feat commit, spec-sync trailer absent) newer than the PRD text means spec-stale — the fix is to the docs, not the code. Don't schedule a revert of intentional work.
+- Is the complaint about one deterministic misbehavior (crashes, wrong sort, missing element → a defect) or about *how good* generated output is, in general or on a category (→ quality)? One bad summary from a correctly-running pipeline is a quality case candidate, not a bug — route it to the quality track and offer its example to the eval set.
 
 **e) Check the track: is this actually an engineering task?**
 
@@ -81,11 +83,11 @@ For each issue, print a structured diagnosis:
 ```
 ## Issue: <one-line summary>
 
-**Scope**: small | medium | large | spec-gap | spec-conflict | spec-stale
+**Scope**: small | medium | large | spec-gap | spec-conflict | spec-stale | quality
 **Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /design-feature | /spec-sync | ask user
+**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /design-feature | /spec-sync | /quality-cycle | ask user
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 

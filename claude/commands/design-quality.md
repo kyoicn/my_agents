@@ -16,7 +16,34 @@ Separation of powers (why this session is structured as it is): pm + user set th
 
 2. Pick the **slug** — all artifacts live under `docs/quality/<slug>/` (e.g. `docs/quality/summary/`).
 
-3. **Detect the measurement shape** and confirm it with the user:
+3. **Inventory existing measurement assets.** Search for pre-existing gold corpora, labeled datasets, replay fixtures, and eval scripts touching this surface (golden/fixture/eval globs plus whatever the project's layout suggests). Anything built *before* this session's bar exists is **provisional by definition** — a measurement corpus is a projection of the qspec, never an independent artifact. Record the list; Phase 3.5 audits it in one pass. (Field data: skipping this cost one team roughly a third of their quality-track engineering in drip-wise reconciliation.)
+
+4. **Create the rulings queue** — `docs/quality/<slug>/rulings.md`, the single home for every owner decision this surface ever needs:
+
+   ```markdown
+   # Rulings: <slug>
+
+   Owner-decision queue and registry. Every decision an agent needs from the
+   owner is filed here — never scattered across chat, tickets, or calibration
+   files. One fact, one home: rows stay minimal (ID + one line + status);
+   link to sources, don't duplicate them. The FILE is the record, not the
+   channel: the owner may answer inline here or in conversation — whoever
+   receives a conversational ruling transcribes it into the entry before
+   acting on it. Ruled entries stay: they are the scope-ruling registry.
+
+   ---
+
+   ### R-001: <one-line question>  [pending | ruled]
+   - **Background**: <one line>
+   - **Options**: A) <...>  B) <...> — **recommended**: <letter, one-line why>
+   - **Default**: <applies if unruled and blast radius is low>
+   - **Blast radius**: <what this decision touches>
+   - **Producer**: <which track/agent is waiting on this> ← update on any handoff;
+     silent reassignment is the violation this field exists to prevent
+   - **Ruling**: <owner's answer + date — empty while pending>
+   ```
+
+5. **Detect the measurement shape** and confirm it with the user:
 
 | Shape | Signature | Instrument implication |
 |---|---|---|
@@ -39,18 +66,22 @@ Conversational, in the main thread, like `/design-feature` discovery — no `Ask
 
 4. **Draft each dimension with an anchored scale** (1–5; anchor 1, 3, 5 minimum) where every anchor cites a real example from this session. An anchor without an example is an adjective — not allowed.
 
-5. **Hunt hard constraints explicitly**: "Is there anything that makes an output unacceptable *regardless* of how good it otherwise is?" (fabricated facts, leaked PII, output in the wrong language). These become auto-fail rules, not scale points.
+5. **Rule at the class, not the item.** When a judgment generalizes ("aspect-marker ranges must include their host span"), capture it once as a class ruling in `rulings.md` and apply it to the whole category. Per-item re-asking burns the scarcest resource in the pipeline — the owner's ruling throughput. (Field-proven: owners converge on class rulings naturally; make it the default elicitation unit.)
 
-6. **Force the tradeoffs**: "When accuracy and conciseness conflict, which wins?" Rank the dimensions. `/quality-cycle`'s gate needs this ordering to accept or reject mixed-result experiments.
+6. **Hunt hard constraints explicitly**: "Is there anything that makes an output unacceptable *regardless* of how good it otherwise is?" (fabricated facts, leaked PII, output in the wrong language). These become auto-fail rules, not scale points.
 
-7. **Set thresholds** — propose defaults, let the user adjust: per-dimension mean target, a tail target (e.g. p10 ≥ 3 — "the bad ones can't be terrible"), hard-fail rate ceiling (e.g. < 1%). Also set the **loop parameters** the qspec carries: eval budget per quality-cycle (official runs), plateau patience k (default 3), judge agreement threshold (default: ≥ 85% exact-or-adjacent on a 5-point scale).
+7. **Force the tradeoffs**: "When accuracy and conciseness conflict, which wins?" Rank the dimensions. `/quality-cycle`'s gate needs this ordering to accept or reject mixed-result experiments.
+
+8. **Route surfaced defects out immediately.** Calibration reliably unearths latent product defects — that's a feature (they're harvested cheaply here instead of expensively via statistical experiments). File each to its standard track on the spot (`/report-bug`, or an ENG entry per the eng-backlog schema), mark the affected calibration items with the issue/ENG ID, and continue the session. Never fix a defect inline mid-calibration.
+
+9. **Set thresholds** — propose defaults, let the user adjust: per-dimension mean target, a tail target (e.g. p10 ≥ 3 — "the bad ones can't be terrible"), hard-fail rate ceiling (e.g. < 1%). Also set the **loop parameters** the qspec carries: eval budget per quality-cycle (official runs), plateau patience k (default 3), judge agreement threshold (default: ≥ 85% exact-or-adjacent on a 5-point scale).
 
 ## Phase 2: Labeling session — the calibration set
 
 The judge will be trusted only as far as it agrees with the user. That requires labels.
 
 1. Assemble **30–50 input+output pairs** spanning the strata and the quality range (deliberately include bad outputs — a calibration set of only good examples can't catch a lenient judge).
-2. The user labels them against the drafted rubric, **in batches of ~10 per turn** — this is tedious; say so, offer to pause and resume across sessions (the batch files persist under `docs/quality/<slug>/calibration/`).
+2. The user labels them against the drafted rubric, **in batches of ~5 per turn** (field-tested default — fatigue degrades label quality before it exhausts patience; smaller batches, more of them). This is tedious; say so, offer to pause and resume across sessions (the batch files persist under `docs/quality/<slug>/calibration/`). The user may label inline in the batch file or answer in conversation — either way the batch file is the record.
 3. Watch for rubric failure while labeling: if the user's labels contradict the anchors ("you scored this 4 but the anchor for 4 says..."), stop labeling and fix the rubric first — label churn against a moving rubric is wasted user time.
 4. Store labels as `docs/quality/<slug>/calibration/labels.md` (one block per item: input ref, output, per-dimension scores, hard-fail flags, the user's one-line reason when given).
 
@@ -118,6 +149,16 @@ Judge agreement threshold: <x>% exact-or-adjacent vs calibration labels.
 Return: created file path + any BLOCKER.
 ```
 
+## Phase 3.5: Existing-asset audit (mandatory when Phase 0 found provisional assets)
+
+The costliest documented failure mode of this command is a corpus built before the bar disagreeing with the bar **drip-wise** — one discovery per calibration batch, each spawning its own engineering wave and owner round-trip. This phase converts the drip into one wave.
+
+1. **Split the qspec's rules**: *lintable* (mechanically checkable — span containment, required fields, format, weights) vs *judgment* (need eyes).
+2. Spawn `evaluator`: write a **corpus linter per lintable rule** (permanent instrument assets under `judge/linters/`, not one-offs), run all of them across every provisional asset; sample-review the judgment rules (~10 items each).
+3. Present **one consolidated, class-grouped discrepancy review** — each discrepancy *class* becomes one `rulings.md` entry with a proposed ruling, default, and blast radius. Batch-process it with the owner. One audit, one review — never item-drip.
+4. Rulings in hand → file remediation as **one ENG wave**: entries per the eng-backlog schema, tagged `instrument-blocking`, `Relates-to: quality/<slug>`. The owner fires the wave with a single command — `/dev-cycle eng --for quality/<slug>` — not one dispatch per ticket.
+5. **Done-condition**: re-running every linter surfaces **no new discrepancy classes** (the convergence signal). Provisional assets then lose their provisional mark — this audit *is* the re-baseline.
+
 ## Phase 4: evaluator builds the instrument
 
 Spawn an `evaluator` subagent (autonomous preamble applies): prompt it to execute its Instrument Build process for `<slug>` — write judge assets, **calibrate against `calibration/labels.md`**, seed the eval set (dev/holdout split across the qspec's strata), install `scripts/eval-runner.sh`, and establish the noise floor.
@@ -149,4 +190,7 @@ Next: run /quality-cycle <slug> to start improving toward the bar.
 - **Don't write the qspec yourself** — pm's subagent owns the file write, same as design-feature Phase 1.
 - **Don't proceed past a failed calibration by lowering the agreement threshold** — that's fabricating the instrument. Refine the rubric or stop honestly.
 - **Don't design improvement experiments here** — that's researcher territory inside `/quality-cycle`. This session defines the bar and the instrument, nothing else.
+- **Don't build measurement corpora before the bar exists** — and treat any that predate it as provisional until Phase 3.5 re-baselines them. Perfectly replicating a deficient gold standard still fails.
+- **Don't let asset discrepancies surface drip-wise** — one audit, one consolidated class-grouped review, one ENG wave.
+- **Don't solicit owner rulings outside `rulings.md`** — conversational answers are welcome, but they're transcribed into the entry before anyone acts on them. A ruling that lives only in chat doesn't exist.
 - **Don't create quality specs for deterministic behavior** — "the export button downloads a CSV" is a PRD acceptance criterion for the dev-cycle, not a quality dimension.

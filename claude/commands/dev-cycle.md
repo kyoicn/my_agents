@@ -14,6 +14,14 @@ Throughout these instructions:
 - **Scoped mode**: replace every mention of "active PRDs under docs/prd/" with the specific target PRD file path. Subagent prompts must name the exact file so agents don't wander into unrelated PRDs.
 - **Unscoped mode**: use all active PRDs as before.
 
+**Eng-wave scope** — `dev-cycle eng` (all eligible open ENG entries), `dev-cycle eng ENG-012,ENG-014` (named entries), or `dev-cycle eng --for <area>` (entries whose `Relates-to` matches, e.g. `--for quality/summary`). An eng-scoped cycle **drains a backlog wave in one command** — the counter to the documented failure mode where the owner hand-carried a dozen-plus tickets one at a time. Phase adjustments:
+- Skip the Mocks Check and Phase 6 (no CUJs in scope). Phase 5 (status) runs only if entries closed.
+- Phase 1 (tl): review only the design impact of the in-scope entries.
+- Phase 2 (planner): plan *only* the in-scope entries, grouped by their `Ordering` constraints and dependencies — carry each entry's `Verify` into the task's "Done when."
+- Phases 3 / 3.5 / 3.6 run normally; tl's review confirms each entry's Verify evidence and removes completed blocks from `docs/eng-backlog.md`.
+- Phase 4 (qa): full test suite + quality-surface smoke checks only — no CUJ walks.
+- Verdict: `done` when every in-scope entry's Verify passed and its block is removed. The exit report **leads with the net line**: `closed <c> / filed <f> (<b> instrument-blocking) / remaining blocking: <n> / new defect classes: <yes/no>` — the owner decides "another wave?" from that one line, and `/loop /dev-cycle eng --for <area>` repeats waves until blocking count is zero or a non-mechanical item needs them.
+
 Next, read `docs/loop-state.md` if it exists to understand the current iteration number and any carry-over context from the previous cycle. **Pay special attention to the QA Gate section** — if the previous iteration ended with QA FAIL, this iteration's Planner must prioritize fixing those failures before taking on new work.
 
 Read `docs/prd/index.md`, all files under `docs/design/`, and `docs/eng-backlog.md` (if it exists — open engineering tasks; `blocking` entries factor into planning and the final verdict) to orient yourself.

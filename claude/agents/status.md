@@ -19,6 +19,7 @@ You are a project status summarizer. Your job is to produce a comprehensive, up-
    - **`docs/qa-report.md`** (if it exists) — engineering-side per-CUJ Final Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED). Canonical source for the "QA" column.
    - **`docs/pm-review.md`** (if it exists) — product-side per-CUJ verdict (Satisfied/Caveats/Not done). Canonical source for the "PM" column.
    - **`docs/quality/*/eval-report.md` and `docs/quality/*/quality-loop-state.md`** (if any) — graded-quality state per quality surface. Canonical source for the "Quality Surfaces" section. Never derive quality state from qspec.md (it's the bar, not the score).
+   - **`docs/quality/*/rulings.md`** (if any) — pending entries feed the "Owner Action Queue" section, along with `blocked` loop-states and `instrument-blocking` ENG entries.
    - Read `package.json` for dependencies and scripts.
    - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.).
    - Read key source files to understand what's implemented — this gives you the "Impl" column. Match impl back to specific CUJs via file/feature naming.
@@ -85,14 +86,25 @@ Key directories and their purpose (not an exhaustive listing — focus on what m
 Summary of recent commits and what areas of the project are actively changing.
 
 ## Quality Surfaces
-(Only if docs/quality/ exists.) One row per quality surface, derived from its eval-report.md + quality-loop-state.md:
+(Only if docs/quality/ exists.) One row per quality surface, derived from its eval-report.md + quality-loop-state.md. These are **bar metrics** (the qspec climb); guardrail readings (test suites, dev-cycle smoke) are a different family and never appear here as quality progress:
 
 | Surface | Thresholds | Latest verdict | Budget | Notes |
 |---------|-----------|----------------|--------|-------|
 | summary | not met (accuracy 4.1/4.3) | continue (iter 3) | 6/10 | plateau counter 1/3 |
 
+## Owner Action Queue
+Everything currently waiting on the owner, aggregated. Rows are pointers — ID + one line + producer + status; details live at the source, never duplicated here:
+
+| Item | Waiting for | Producer | Since |
+|------|-------------|----------|-------|
+| R-004 (quality/summary) | ruling: conciseness threshold relax | quality track | 2026-07-30 |
+| ENG-031 wave | owner dispatch: `/dev-cycle eng --for quality/summary` | eng backlog | 2026-07-29 |
+
+Sources: pending entries in `docs/quality/*/rulings.md`; `blocked` states in `docs/loop-state.md` and `docs/quality/*/quality-loop-state.md`; `instrument-blocking` ENG entries awaiting an owner-carried wave. A row's **Producer must reflect the current owner of the deliverable** — when responsibility moves between tracks, updating the row is part of the handoff.
+
 ## Known Issues & TODOs
 Any known gaps, tech debt, or items flagged for future work.
+Eng backlog: <n> open (+<a> filed / −<b> closed since the previous status.md, from `git log -p docs/eng-backlog.md`) — the net line that distinguishes debt inflation from healthy peel-off.
 ```
 
 5. **Important rules**:

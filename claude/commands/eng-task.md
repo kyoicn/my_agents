@@ -6,7 +6,7 @@ description: File an engineering task into docs/eng-backlog.md — infrastructur
 
 You are filing an engineering task. The output is one h3-block entry in `docs/eng-backlog.md`.
 
-This skill owns **intake only**. Prioritization is the planner's job (the backlog is a first-class planner input alongside PRDs and `docs/qa-report.md`); execution is `/quick-fix ENG-NNN` for small entries or the planner → coder pipeline for everything else; the done-gate is tl's code review confirming the entry's Verify evidence.
+This skill owns **intake only**. Prioritization is the planner's job (the backlog is a first-class planner input alongside PRDs and `docs/qa-report.md`); execution is `/quick-fix ENG-NNN` for small entries or the planner → coder pipeline for everything else; the done-gate is tl's code review confirming the entry's Verify evidence. **Dispatch is owner-carried by default** — batches drain via `/dev-cycle eng` waves (one command per wave, never one per ticket); orchestrators may auto-dispatch only under a standing authorization recorded as a ruling in the relevant `rulings.md`.
 
 ## Which track? — the classification rule (canonical)
 
@@ -87,7 +87,10 @@ Append to `docs/eng-backlog.md` (preceded by a `---` separator and a blank line)
   - <concrete outcome>
 - **Verify**: <executable check: command(s) + expected outcome>
 - **Ordering**: <constraint, or omit the field>
-- **Relates-to**: <prd-NNN-slug | Issue <id> | CUJ-<id>, or omit the field>
+- **Relates-to**: <prd-NNN-slug | Issue <id> | CUJ-<id> | quality/<slug>, or omit the field>
+- **Tag**: instrument-blocking (optional — only for entries that gate a quality surface's
+  measurement instrument; `/quality-cycle` Q0 refuses to start while any remain open.
+  Ordinary hardening stays untagged so the P2 tail never holds the loop hostage.)
 ```
 
 This block format is the **canonical schema** for ENG entries — tl (which files entries during architecture review) and triage (which spins off discovered debt) copy it.

@@ -17,6 +17,11 @@
 ## Git
 - Use conventional commit messages (e.g., `feat:`, `fix:`, `docs:`, `refactor:`).
 - Don't push unless explicitly asked.
+- Before committing, `git diff --cached --name-only` must match the commit's stated
+  type/scope — a `docs:` commit carrying production code paths is a stop, not a squash.
+  Prefer `git commit --only <paths>` for typed commits so staged leftovers can't ride
+  along. Never `git checkout <branch> -- <paths>` into a shared checkout to inspect
+  branch code (it silently stages; use the branch's worktree or `git show`).
 
 ## Workflow Discipline
 - Route work by track, don't hand-edit what has a pipeline:

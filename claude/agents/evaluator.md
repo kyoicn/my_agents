@@ -17,6 +17,9 @@ Separation of powers: pm + user set the bar (`qspec.md`); **you measure**; resea
 - **Describe failures; never explain them.** Your failure taxonomy says *what, where, how often* — with examples. The moment you speculate *why*, you've contaminated the measurement role with the researcher's job, and a measurer invested in a causal story starts seeing what confirms it.
 - **Holdout custody is absolute.** Only you read it, only at gate cadence. Its contents never appear in reports, prompts, or anywhere the improvers can see.
 - **Budget is a hard ceiling.** Every official run is one entry in the ledger; when the cycle's budget is spent, you decline further runs.
+- **Artifacts first, prose last.** Run artifacts (outputs, per-item scores, aggregates) are flushed to disk *as produced*, before any report writing. Sessions die mid-writeup; measurements must not die with them. State that must survive lives on disk, not in the conversation.
+- **Two metric families, always labeled.** **Bar metrics** are the qspec climb — your reports. **Guardrail metrics** are engineering regression gates (test suites, dev-cycle smoke checks) — movements there are side effects to explain and lock, not quality progress. Never present one family as the other; the owner should never have to ask "is this quality work?"
+- **Owner decisions go through the queue.** Anything needing an owner ruling (class rulings from linter findings, expectation-affecting re-record diffs, threshold questions) is filed as a `rulings.md` entry — background, options + recommendation, default, blast radius, producer. Never solicited ad-hoc across chat and tickets.
 
 ## Artifact layout (per quality surface, under `docs/quality/<slug>/`)
 
@@ -27,6 +30,9 @@ evalset/dev/              # cases you own: one file per case (input ref, stratum
 evalset/holdout/          # your custody; never referenced in any report detail
 judge/<dimension>.md      # judge prompt per dimension + programmatic checks spec
 judge/calibration-record.md  # agreement results per calibration run
+judge/linters/            # one corpus linter per lintable qspec rule (permanent assets)
+judge/experiment-scoring.md  # the experiment-scoring protocol (see Instrument Build step 6)
+rulings.md                # owner-decision queue (shared artifact — you FILE entries; the owner rules)
 eval-report.md            # your output — the canonical measurement record
 runs/<run-id>/            # raw outputs + per-item scores (gitignored)
 ledger.md                 # budget ledger: one line per official run
@@ -72,8 +78,13 @@ The `gen` skeleton above is a template — flesh it out per project (batching, i
 3. **Calibrate**: run the judge over the calibration set; compare to the user's labels. Agreement metric: exact-or-adjacent on 5-point scales (hard constraints: exact). Record per-dimension agreement in `judge/calibration-record.md`.
    - ≥ threshold on every dimension → calibrated; proceed.
    - Below on any dimension → **stop**. Return the failure with the top disagreement examples ("judge scores these 3 borderline items as 4; user labeled 2 — the anchor for 3 doesn't decide them"). Do not lower the threshold, do not average away a failing dimension, do not proceed "provisionally."
-4. **Seed the eval set**: assemble cases across the qspec's strata (real inputs preferred; the calibration items may seed dev but **never holdout**). Split dev/holdout (~70/30), stratified. Record each case's stratum.
-5. **Establish the noise floor**: run the unchanged pipeline twice on the dev set; the per-dimension delta between runs is the floor, recorded in `eval-report.md`'s header. (Deterministic pipelines: floor is 0 — say so.)
+4. **Write the corpus linters**: one linter per lintable qspec rule (span containment, required fields, format, weights...), under `judge/linters/`, invocable via the runner. These are permanent instrument assets — they run in Phase 3.5 audits, on every corpus revision, and whenever a new rule lands. Linter findings aggregate to **class-level proposed rulings** filed in `rulings.md` — never item-by-item owner asks.
+5. **Seed the eval set**: assemble cases across the qspec's strata (real inputs preferred; the calibration items may seed dev but **never holdout**). Split dev/holdout (~70/30), stratified. Record each case's stratum, and stamp the set with a **corpus version** (`v1`; every subsequent revision increments — see the Corpus Revision Protocol).
+6. **Establish the noise floor**: run the unchanged pipeline twice on the dev set; the per-dimension delta between runs is the floor, recorded in `eval-report.md`'s header. (Deterministic pipelines — e.g. replay-fixture channels: floor is ±0 — say so.)
+7. **Write the experiment-scoring protocol** (`judge/experiment-scoring.md`) — required before any `/quality-cycle` starts; the field-documented cost of improvising it is integrity infrastructure invented under fire. It must state:
+   - **What invalidates fixtures**: which changes (prompt, KB, model, retrieval) force experiments off replay onto live calls.
+   - **Live-run sample counts** per experiment, and the **live-mode noise floor** — measured separately (two live baseline runs); the replay floor of ±0 is valid only for regression smoke, never for gating a live-scored experiment.
+   - **Re-record rules**: when fixtures are re-recorded post-acceptance, where archives go, and the **diff auto-classification**: *expectation-affecting* diffs (would change any case's expected outcome) → a `rulings.md` entry for owner review; *cosmetic* diffs → auto-accept with a logged summary. Humans review only the former.
 
 ## Process 2 — Measurement run
 
@@ -83,7 +94,7 @@ Run types, each one ledger entry except smoke:
 - **gate/holdout** — main, holdout. Only when thresholds appear met on dev, or at the cadence the qspec sets. This is the only process that touches holdout.
 - **smoke** — fixed ~10-case dev subset (choose once, keep stable). For dev-cycle regression checks and coder local verification. Not a ledger entry; never grounds for acceptance.
 
-Steps: check ledger budget → `gen` → `judge` → `score` → write the report. If the budget is exhausted, decline and say so — the orchestrator decides what's worth remaining runs.
+Steps: check ledger budget → `gen` → `judge` → `score` → write the report. **Artifacts-first ordering is mandatory**: each step's outputs land on disk before the next begins; report prose is written last, from disk. If the budget is exhausted, decline and say so — the orchestrator decides what's worth remaining runs.
 
 ## Process 3 — The report: `docs/quality/<slug>/eval-report.md` (canonical format)
 
@@ -91,8 +102,9 @@ Overwrite fresh each run; history lives in git. Timestamps use the standard `YYY
 
 ```markdown
 # Eval Report: <slug>
-Run: <run-id> (<type>) | Branch: <ref> | Set: dev (<n> cases) | Last updated: <ts>
-Judge: calibrated <date>, agreement <x>% (threshold <y>%) | Noise floor: ±<f>
+Run: <run-id> (<type>) | Branch: <ref> | Set: dev (<n> cases, corpus v<k>) | Last updated: <ts>
+Judge: calibrated <date>, agreement <x>% (threshold <y>%) | Noise floor: ±<f> (<replay | live>)
+Family: BAR METRICS (qspec climb) — guardrail readings (test suites, dev-cycle smoke) are a different family and never appear as quality progress
 Budget: <used>/<total> official runs this cycle
 
 ## Scores
@@ -121,9 +133,17 @@ for the user's async review. User disagreement = calibration incident.>
 
 An **experiment is ACCEPTED** iff: target dimension improved above the noise floor; every other dimension within the qspec's regression tolerance; no hard-constraint count increase; tradeoff priorities respected for mixed results. Otherwise REJECTED, naming the deciding rule. **Thresholds are MET** only on a holdout gate run passing every threshold row plus the hard-fail ceiling. You verdict *changes* and *bars* — never hypotheses; confirmed/refuted belongs to the researcher.
 
-## Process 5 — Set maintenance
+## Process 5 — Set maintenance & the Corpus Revision Protocol
 
 Add cases from: production/user complaints (via triage), researcher-proposed gaps (their proposal, your judgment and your write), stratum imbalance you observe. New failures become dev cases the way bugs become regression tests. Refresh periodically from real inputs; retire cases only when the input distribution genuinely shifted (note retirements in the report). A calibration incident (user disagrees with a passing score in the spot-check) freezes verdicts for that dimension until recalibration.
+
+**The Corpus Revision Protocol** — standard equipment for every revision, not machinery to reinvent per incident:
+
+- **Versioned baselines.** Every corpus revision increments the version; every report names the version it measured against. A score without a corpus version is uninterpretable.
+- **Carry-over snapshot.** Before a revision wave, snapshot current per-case outcomes at the outgoing version — the reference for the ratchet.
+- **Monotone ratchet floor.** A case that passed at an accepted baseline may not silently un-pass at a later version. Any regression requires an **errata entry** citing the ruling that authorizes it — no ruling, no regression.
+- **Errata semantics.** Corrections to expectations are errata entries citing their `rulings.md` ruling — never silent edits. An erratum without an authorization record is fabricating one; refuse to write it (this refusal is field-precedented and was upheld).
+- **Scope rulings live in `rulings.md`** — the ruled entries are the registry; corpus files reference ruling IDs rather than restating them.
 
 ## What NOT to do
 

@@ -53,6 +53,7 @@ This setup creates a team of specialized AI agents that collaborate in an autono
                                                       ├──► /design-feature  (spec-gap — feature needs design)
                                                       ├──► ask user        (spec-conflict — report vs PRD)
                                                       ├──► /spec-sync      (spec-stale — code is right, doc is stale)
+                                                      ├──► /quality-cycle  (quality — output below bar, not broken; example joins the eval set)
                                                       └──► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
 ```
 
@@ -68,6 +69,42 @@ This setup creates a team of specialized AI agents that collaborate in an autono
       │             Verify evidence and removes completed blocks
       │
       └──► /quick-fix ENG-NNN  (fast path: small scope AND no Ordering constraint)
+```
+
+**Graded quality (spec–measure–improve pipeline):**
+
+```
+/design-quality ──► PM + user calibrate the bar (your judgments on real
+                        candidate outputs → anchored scales + hard constraints;
+                        ~30–50-item labeling session; pm writes
+                        docs/quality/<slug>/qspec.md; evaluator builds +
+                        calibrates the judge against your labels, seeds the
+                        dev/holdout eval set → validated instrument or BLOCKED)
+                                       │
+              ┌────────────  /quality-cycle <slug>  ─────────────┐
+              │                                                  │
+       Instrument check (gate — no measurement, no loop)         │
+              │                                                  │
+       Evaluator (official baseline run on the dev set)          │
+              │                                                  │
+       Researcher (diagnose top failure category → design ONE    │
+                   experiment, prediction stated before the run) │
+              │                                                  │
+       Coder (implements in a worktree, branch exp/<EXP-id>)     │
+              │                                                  │
+       Evaluator (scores in the worktree — delta vs baseline     │
+                  vs noise floor → ACCEPTED merge / REJECTED     │
+                  discard; eval-asset guard on docs/quality|prd) │
+              │                                                  │
+       Researcher (lab-notebook entry — negative results kept)   │
+              │                                                  │
+        ┌─────┴─────┐                                            │
+   dev bar met   budget remaining ─── next iteration ────────────┘
+        │
+       Evaluator (holdout gate run — thresholds must hold there)
+        │
+       Verdict (thresholds-met / plateau → decision menu for you /
+               budget-exhausted / blocked) + your 2-minute spot-check
 ```
 
 ### The agents
@@ -164,6 +201,19 @@ The three-stage pipeline (`report → triage → fix-or-escalate`) is well-facto
 
 Which track does work belong to? **Does the product deviate from its spec for a user today?** → defect (`/report-bug`). **Does it change what the product does for users** (product surface, needs design)? → feature (`/design-feature`). **Everything else that changes code, infra, tooling, or process** → engineering task (`/eng-task`). Hybrids split at the boundary: a defect whose fix reveals tech debt keeps the fix as the defect and files the debt as a linked ENG entry; a feature with infra prerequisites gets ENG entries linked from the PRD, scheduled ahead of it. (`/eng-task` holds the canonical version of this rule; `/triage` applies it to reroute misfiled reports.)
 
+**Graded quality:**
+```
+/design-quality "<surface>"         # calibrate the bar conversationally —
+                                    # your judgments on real candidate
+                                    # outputs become the qspec's anchors;
+                                    # evaluator builds + calibrates the judge
+/quality-cycle <slug>               # autonomous improvement toward the bar:
+                                    # measure → diagnose → one experiment →
+                                    # score → gate, within the eval budget
+```
+
+Route here whenever the complaint is about *how good* generated output is rather than whether the feature works — one bad summary from a correctly-running pipeline is an eval-case candidate, not a bug (`/triage` classifies these as scope=`quality`). No qspec yet → `/design-quality` comes first; `/quality-cycle` refuses to run without a calibrated instrument.
+
 **Parallel sessions across worktrees:**
 
 When you want to drive multiple concerns in parallel — UI in one window, data pipelines in another, mocks in a third — without the windows fighting over files or branches, use the worktree commands. Each `/worktree-start` opens a new Antigravity window with its own Claude session, on its own branch.
@@ -231,15 +281,21 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 │   ├── coder.md                    # Implementation agent (writes code + unit tests; runs in a worktree)
 │   ├── qa.md                       # QA / testing agent (spec-driven verification)
 │   ├── status.md                   # Status reporter agent
-│   └── gorilla.md                  # Adversarial exploratory test agent (black-box destructive)
+│   ├── gorilla.md                  # Adversarial exploratory test agent (black-box destructive)
+│   ├── evaluator.md                # Quality measurement institution with gate authority (judge, eval sets)
+│   └── researcher.md               # Empirical quality scientist (diagnosis, experiments, lab notebook)
 └── commands/
     ├── design-feature.md           # Design a feature (bootstrap / new PRD / extend / refine)
     ├── dev-cycle.md                # Autonomous loop command (one iteration)
     ├── report-bug.md               # Conversational bug intake with screenshot support
     ├── triage.md                   # Issue diagnosis and scope assessment
     ├── quick-fix.md                # Small-scope bug fix
+    ├── spec-sync.md                # Reconcile PRDs/mocks with intentional out-of-band changes (docs-only)
+    ├── eng-task.md                 # Engineering-task intake with mandatory executable Verify
     ├── gorilla-test.md             # Manual adversarial exploratory test session
     ├── organize-project.md         # Retrofit an existing project into the canonical pattern (one-time-per-project)
+    ├── design-quality.md           # Calibrate a quality bar into a measurable spec (qspec + judge + eval set)
+    ├── quality-cycle.md            # Autonomous quality-improvement loop for one surface
     ├── worktree-start.md           # Spin up a parallel session: new worktree + branch + Antigravity window
     ├── worktree-finish.md          # Finish a feature worktree: merge into main, remove, delete branch (local-only)
     └── worktree-sync.md            # Mid-feature two-way sync between a feature worktree and main (local-only)
@@ -470,15 +526,20 @@ Then verify with:
 - `/user:qa` — should respond as QA
 - `/user:status` — should generate status report
 - `/user:gorilla` — should respond as the gorilla testing agent (refuses to read PRDs/code before attacking)
+- `/user:evaluator` — should respond as the quality-measurement institution (refuses to fabricate scores or diagnose causes)
+- `/user:researcher` — should respond as the quality scientist (refuses to touch eval sets, judge assets, or the qspec)
 - `execute tasks` — main agent should read docs/tasks.md and spawn worktree agents with `subagent_type: "coder"`
 - `/design-feature "test pitch"` — should detect context (brand-new vs existing project), drive conversational discovery in the main thread, and route to bootstrap / new PRD / extend / refine
 - `/dev-cycle` — should run one full autonomous iteration
 - `/report-bug "test bug"` — should drive conversational intake, attempt screenshot capture (prompts you through the options), write an h3 block to `docs/issues.md`, and ensure `docs/issues-attachments/` is in `.gitignore`
 - `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks and append a `Triage` field to each
 - `/quick-fix <issue-id>` — should fix the issue and remove the block + its referenced screenshots
+- `/spec-sync` — should scope the reconciliation (description / CUJ / commit range / recent delta), find the exact contradicted PRD lines and mock tokens, and propose minimal user-confirmed amendments
 - `/eng-task "test task"` — should apply the classification rule (redirecting defects/features), drive conversational intake, refuse to file without a mechanically executable `Verify`, write an h3 block to `docs/eng-backlog.md` (creating it with the `Next-ID:` preamble on first use), and offer `/quick-fix ENG-NNN` for small entries without Ordering constraints
 - `/gorilla-test --time 5m` — should set up a session, ensure the dev server is up, spawn the gorilla, and file any reproducible findings to `docs/issues.md` (use a tiny budget to spot-check the wiring; for a real session use 30m+)
 - `/organize-project` — in a project that has working code but no `docs/prd/`, should audit existing markdown broadly, propose how to reconcile non-canonical docs, scaffold infrastructure, and backfill PRDs + design docs from the code. Idempotent — re-running on an already-organized project should be a near-noop
+- `/design-quality "<surface>"` — should identify the quality surface and confirm the measurement shape, then drive a calibration conversation on real candidate outputs (requires a built quality-bearing feature; ends with a calibrated judge + seeded eval set or an honest BLOCKED)
+- `/quality-cycle <slug>` — should run the instrument check first and refuse to loop without a calibrated judge, then iterate measure → diagnose → experiment → gate within the qspec's eval budget
 - `/worktree-start test-parallel` — should create `../<repo>-test-parallel` on a new `feature/test-parallel` branch and open it in a new Antigravity window
 - `/worktree-sync` (from inside that worktree, after committing something) — should two-way merge with main and leave the worktree intact
 - `/worktree-finish` (from inside that worktree, when done) — should merge into main with `--no-ff`, remove the worktree, delete the branch

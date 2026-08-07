@@ -268,7 +268,7 @@ If `pm` reports a blocker (missing context, contradictory brief, etc.), surface 
 
 `docs/status.md` is the canonical per-CUJ progress doc. It must exist from day 0 so the user (and the loop's agents) always have one place to answer "where are we?". This phase runs after Phase 1, and its behavior depends on the route.
 
-Spawn a `status` subagent. Embed the route + the CUJ IDs that were just written/modified in the prompt so the status agent knows what to add or update:
+Spawn a `reporter` subagent. Embed the route + the CUJ IDs that were just written/modified in the prompt so the reporter knows what to add or update:
 
 ```
 Prompt: "Refresh docs/status.md. Route was [A | B | C | D].
@@ -372,4 +372,5 @@ Substitute every `<placeholder>` with the actual content from PM's return + the 
 - **Don't reference `docs/ux/README.md`, `MOCK_BRIEF.md`, or "Claude Desktop" anywhere.** The async-handoff flow is gone. Mocks live in `docs/ux/<prd-dir>/cuj-*.{html,...}`; that's it.
 - **Don't write the PRD yourself in the orchestrator.** Phase 1 PM subagent owns the file writes. You own the conversation, the shapes, the mocks, and the handoff.
 - **Don't skip the routing decision in Phase 0.** A pitch that should extend an existing PRD must NOT become a new PRD just because writing a new file is mechanically simpler. Wrong routing fragments features across PRDs and confuses the planner downstream.
+- **Don't yield the session with an owner decision living only in the conversation.** Anything the user deferred ("let me think about it") or left unanswered gets a `docs/owner-queue.md` entry (per `dev-cycle.md`'s Owner Decision Protocol) before the final handoff — a decision that lives only in chat doesn't exist.
 - **For Route D: don't try to preserve old mocks alongside revised ones.** When the user confirms refinement and you redraw the affected mocks in Phase 0.5, you overwrite the prior files at the same paths. Mock-file paths are stable identifiers (`cuj-<id>-<state>.html`); the file content evolves.

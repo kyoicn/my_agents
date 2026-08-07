@@ -17,7 +17,7 @@ The flow:
 - **Phase 3** — Derive design docs via the `tl` agent: read existing code + adopted/migrated design content, write `docs/design/system.md` + per-component `design-<slug>.md`.
 - **Phase 4** — Propose feature → PRD mapping conversationally: group detected features into proposed PRDs, get user confirmation. Skip features already covered by existing canonical PRDs.
 - **Phase 5** — Backfill PRDs via the `pm` agent (one invocation per PRD, sequential): read the relevant code + adopted/migrated PRD-like content, generate CUJs that describe what's actually built, write `prd-NNN-<slug>.md`, update `docs/prd/index.md`. **Mocks are not auto-generated** — backfilled CUJs describe existing code, so visual fidelity isn't enforced until you actively want it. The CUJs' "Mocks / Reference Designs" sections state "No mocks (backfilled from existing impl — run /design-feature Route D to add mocks if visual fidelity matters)."
-- **Phase 6** — Seed `docs/status.md` via the `status` agent: all CUJs enter with Impl=`merged`, QA=`—`, PM=`—`.
+- **Phase 6** — Seed `docs/status.md` via the `reporter` agent: all CUJs enter with Impl=`merged`, QA=`—`, PM=`—`.
 - **Phase 7** — Hand off with summary and suggested next step.
 
 ## Phase 0: Audit broadly
@@ -274,9 +274,9 @@ Return: a one-line summary plus the list of CUJ-IDs created.
 
 After each PM run, briefly note progress to the user ("prd-000-articles done, 4 CUJs; moving on to prd-001-auth").
 
-## Phase 6: Seed `docs/status.md` via the `status` agent
+## Phase 6: Seed `docs/status.md` via the `reporter` agent
 
-Spawn the `status` agent with route awareness — this is similar to `/design-feature` Phase 2.5 but covers all the newly backfilled PRDs at once.
+Spawn the `reporter` agent with route awareness — this is similar to `/design-feature` Phase 2.5 but covers all the newly backfilled PRDs at once.
 
 Prompt:
 

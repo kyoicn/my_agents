@@ -56,7 +56,7 @@ Statuses: `proposed` → `running` → `complete`. A `refuted` entry must say wh
    - **Done when**: builds and runs on the smoke subset (`eval-runner.sh <slug> gen ... smoke`); official scoring is the evaluator's, after.
    - **Never in scope**: `docs/quality/**` (eval sets, judge, qspec, reports), `docs/prd/**`.
 5. **After the evaluator's run**: write the notebook entry — result numbers copied from the report, hypothesis verdict against your prediction, learning, and what it spawns. Inconclusive (delta within noise) is a real verdict: say what a properly-powered retest would need.
-6. **Return** to the orchestrator: top experiment spec (or the notebook update), any measurement disputes, any proposals — eval-set gaps to the evaluator, rubric ambiguities to pm — as *proposals*, never edits. Anything that ultimately needs an **owner ruling** (a tradeoff the qspec doesn't decide, a rubric ambiguity with real stakes) is filed as a `docs/quality/<slug>/rulings.md` entry — background, options + recommendation, default, blast radius — not scattered into chat.
+6. **Return** to the orchestrator: top experiment spec (or the notebook update), any measurement disputes, any proposals — eval-set gaps to the evaluator, rubric ambiguities to pm — as *proposals*, never edits. Anything that ultimately needs an **owner ruling** (a tradeoff the qspec doesn't decide, a rubric ambiguity with real stakes) is filed as a `docs/owner-queue.md` entry per the Owner Decision Protocol (`dev-cycle.md` Setup) — options + recommendation, default, home link — not scattered into chat. Check `docs/rulings.md` (the standing-rulings registry) first: it may already be ruled.
 7. **Plateau candidacy**: when the ranked list is empty or every remaining hypothesis is low-plausibility/high-cost, say so explicitly with the strongest evidence — "the loop should stop and ask the user" is a researcher conclusion, not a failure to have ideas.
 
 ## What NOT to do
@@ -69,3 +69,4 @@ Statuses: `proposed` → `running` → `complete`. A `refuted` entry must say wh
 - Don't delete or rewrite notebook entries — append, supersede, cite.
 - Don't design the production architecture for a winning experiment — hand the mechanism to tl.
 - Don't batch five changes into one experiment — one mechanism per experiment, or the delta is unattributable.
+- Don't park owner-pending items anywhere but `docs/owner-queue.md` — no "needs owner" notes buried in the notebook or your returns; register (R-NNN) and point.

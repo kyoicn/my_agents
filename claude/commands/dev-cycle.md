@@ -1,5 +1,5 @@
 ---
-description: Run one iteration of the autonomous development loop. Orchestrates tl, planner, task execution, qa, status, and pm agents in sequence. Updates docs/loop-state.md with iteration progress.
+description: Run one iteration of the autonomous development loop. Orchestrates tl, planner, task execution, qa, reporter, and pm agents in sequence. Updates docs/loop-state.md with iteration progress.
 ---
 
 # Dev Cycle — One Iteration
@@ -15,7 +15,7 @@ Throughout these instructions:
 - **Unscoped mode**: use all active PRDs as before.
 
 **Eng-wave scope** — `dev-cycle eng` (all eligible open ENG entries), `dev-cycle eng ENG-012,ENG-014` (named entries), or `dev-cycle eng --for <area>` (entries whose `Relates-to` matches, e.g. `--for quality/summary`). An eng-scoped cycle **drains a backlog wave in one command** — the counter to the documented failure mode where the owner hand-carried a dozen-plus tickets one at a time. Phase adjustments:
-- Skip the Mocks Check and Phase 6 (no CUJs in scope). Phase 5 (status) runs only if entries closed.
+- Skip the Mocks Check and Phase 6 (no CUJs in scope). Phase 5 (reporter) runs only if entries closed.
 - Phase 1 (tl): review only the design impact of the in-scope entries.
 - Phase 2 (planner): plan *only* the in-scope entries, grouped by their `Ordering` constraints and dependencies — carry each entry's `Verify` into the task's "Done when."
 - Phases 3 / 3.5 / 3.6 run normally; tl's review confirms each entry's Verify evidence and removes completed blocks from `docs/eng-backlog.md`.
@@ -53,17 +53,82 @@ Steps:
 | `qa gate iteration 3` | `data: qa gate iteration 3` |
 | `task: implement filter UI` | `data: task: implement filter UI` |
 
-This applies to every subagent spawned by this skill — tl, planner, qa, status, pm, and every task-execution worker. It does not change anything inside the subagent's prompt body; only the `description` (the visible label).
+This applies to every subagent spawned by this skill — tl, planner, qa, reporter, pm, and every task-execution worker. It does not change anything inside the subagent's prompt body; only the `description` (the visible label).
 
 ### Autonomous Preamble
 
-Every subagent prompt this skill sends (tl, planner, qa, status, pm, and every task-execution coder) must **begin** with this paragraph, verbatim:
+Every subagent prompt this skill sends (tl, planner, qa, reporter, pm, and every task-execution coder) must **begin** with this paragraph, verbatim:
 
 > You are running unattended inside an orchestrated pipeline; no user is available. Do not ask questions or wait for approval — approval and confirmation steps in your role definition apply only to interactive invocations. Resolve ambiguity in this order: this prompt → the project docs → the simplest reasonable default. If you hit a genuine contradiction you cannot resolve, stop and return "BLOCKER: <description>" as your final message.
 
 This is what lets role definitions keep their interactive behaviors (planner's plan approval, pm's clarifying questions) without deadlocking the loop: the roles define the craft, the invocation defines the interaction contract, and human judgment re-enters at the loop boundary instead of mid-subagent.
 
-**If any subagent's return contains `BLOCKER:`**, stop the cycle, set `docs/loop-state.md` status to `blocked` with the blocker text under "Blocker", and notify the user — the same handling as Phase 1's tl blocker path, generalized to every phase.
+**If any subagent's return contains `BLOCKER:`**, stop the cycle, register the blocker as a `docs/owner-queue.md` entry (per the Owner Decision Protocol below — this is the only registration path for worktree agents), set `docs/loop-state.md` status to `blocked` with the blocker text + its R-NNN under "Blocker", and notify the user — the same handling as Phase 1's tl blocker path, generalized to every phase.
+
+### Owner Decision Protocol
+
+Two project-level files carry every decision that waits on the owner. This is the canonical spec — `/quality-cycle`, `/design-quality`, `/triage`, and the role definitions inherit it by reference.
+
+**`docs/owner-queue.md` — the queue.** Everything currently blocked on the owner, nothing else. Human-first and drained: a closed entry leaves the file (history is git log). Entries append at the bottom, so the oldest sits on top. Written in the project's working language — this is the most human-facing artifact in the repo. An entry fits on one screen; context beyond ~2 lines goes behind its home link. Create on first need:
+
+```markdown
+# Owner Queue
+
+> Everything currently waiting on your decision — nothing else. Entries append
+> at the bottom, so the oldest sits on top. Answer by writing under
+> "your answer" (agents transcribe and clear the entry), or just say it in
+> chat. When nothing is below the line, nothing is waiting on you.
+Next-ID: R-001
+
+---
+```
+
+Entry format — headline question · one metadata line · ≤2 lines of context with a link to the item in its home track · scannable options with exactly one recommendation · a default line · an answer slot:
+
+```markdown
+### R-014 · <one-line question>
+
+waiting since iter-51 (3 iters) · <scope> · producer: <who is waiting>
+
+One or two lines of plain context — why this is on the owner's desk and
+what it unblocks. Details: [<home item>](<link into the owning track>).
+
+- **A. <option>** — <consequence in one line>
+- **B. <option>** *(recommended — <one-line why>)*
+
+*Unanswered by <trigger> → B applies automatically.*   ← or: *No default — stays open.*
+
+> **your answer:**
+```
+
+**`docs/rulings.md` — the registry.** Standing rulings only: class rulings, standing authorizations, threshold decisions — answers that govern cases nobody has looked at yet. Append-only, agent-facing, entries never deleted (agents and errata cite them by R-ID). Same ID namespace as the queue; an entry keeps its number when promoted. Registry entry = question + context + `**Scope**: <project | quality/<slug> | prd-NNN | eng>` + `**Ruling**: <answer + date (+ "defaulted" when it armed)>`.
+
+**Admission gate.** An item enters the queue only if BOTH hold: (1) a pipeline is blocked, or will act wrongly, without the answer; (2) no lower authority decides it — the planner's priority ladder, triage's routing table, qspec thresholds, and ENG Priority all outrank the queue. New bugs/issues/detections go to their own track. **No FYIs, ever** — notifications belong in exit reports and `docs/status.md`. Queue rows are pointers to the item in its home track, never copies.
+
+**Who writes.**
+- Shared-checkout subagents (tl, planner, qa, evaluator, researcher, pm, reporter): file the entry the moment a non-blocking owner decision surfaces; cite its R-NNN in your own output.
+- Orchestrators: register on every `BLOCKER:` return (the only path for worktree agents — coder never writes these files; a branch write dies with a rejected branch), on every `blocked` state write (the Blocker section cites the R-NNN), and **before** asking a decision-class `AskUserQuestion` (answered → transcribe and close the same turn; declined or unanswered → the entry stays). Interactive design/calibration conversations are exempt per-question, but anything still open when the session yields is registered first.
+- The owner: any edit is legal and reads as a ruling. Deleting an entry = decline-to-rule; the default applies.
+
+**Answers and close-time classification.** A conversational answer is transcribed into the entry before anyone acts on it. Closing asks one question: *does this answer govern cases nobody has looked at yet?* Durable → move the entry to `docs/rulings.md` with the Ruling filled. Transient → delete it once the acting track records the outcome. Answers given live in conversation skip the queue entirely (durable → straight into the registry; transient → the acting artifact is the record). "Park" = keep pending with a new trigger. **Arming discipline**: arm a default only when applying it wrongly is cheap to undo — transient items should almost always arm (they go stale; defer/skip is safe); durable rulings rarely should (a class ruling by timeout is a wrong rule silently governing everything downstream).
+
+**Secrets.** For content-confidential items (holdout spot-checks and kin), the queue holds a stub: existence + a reconstruction path ("contents by message only; evaluator rebuilds from `runs/<id>`"). Contents never land in the repo.
+
+**The sweep — run it now, every iteration, as part of this Setup:**
+1. Read `docs/owner-queue.md` (absent and nothing to file → skip silently).
+2. Process filled `your answer` slots: transcribe → route the outcome to its producer/track → close per classification.
+3. Apply armed defaults whose trigger has passed: record as defaulted → close per classification.
+4. Run `./scripts/owner-lint.sh` (generate it first if missing, per the spec below; committed, `chmod +x`). **Red** findings are ownerless-remediable — fix them now (register the scattered item, add the missing field, close the answered entry) and re-run. **Yellow** findings flow into the exit report's queue line.
+
+Every exit report this skill produces carries one fixed line: `Owner queue: +<n> filed / <m> closed (<k> defaulted) / <j> open (oldest R-NNN, <i> iters)`.
+
+**`scripts/owner-lint.sh`** — a **vocabulary ratchet**: it catches *marked* scatter, and that limit is by design. Exit non-zero when any RED holds; print YELLOW lines to stdout. Checks:
+- RED: owner-pending vocabulary (`待 OWNER`, "blocked on owner", "awaiting owner", "needs owner", "owner approval", "pending owner", or the project-language equivalents) on a line in `docs/**/*.md` outside `owner-queue.md` without an `R-<digits>` ID.
+- RED: an owner-section heading (`Owner Action Queue`, `Owner Queue`, `待 OWNER`) anywhere outside `docs/status.md` and `docs/owner-queue.md`.
+- RED: `Status: blocked` in a loop-state file without an R-ID in its Blocker section.
+- RED: a queue entry missing options, a recommendation, a default line (or explicit no-default), a home link, or its answer slot; or a filled answer slot not yet processed.
+- RED: a registry entry without a `**Ruling**:`.
+- YELLOW: an armed default past its trigger; an unarmed entry pending ≥ 3 iterations.
 
 ---
 
@@ -79,7 +144,7 @@ Mocks are normally produced during `/design-feature` Phase 0.5 alongside CUJ sha
 
 3. If every in-scope CUJ has at least one matching mock file, print one line ("Mocks present for all in-scope CUJs.") and continue to Phase 1.
 
-4. Otherwise, list the CUJs missing mocks and use `AskUserQuestion` to ask the user to choose:
+4. Otherwise, list the CUJs missing mocks. Per the Owner Decision Protocol, register the choice as a `docs/owner-queue.md` entry first (recommended + default: Proceed — QA logs `NO_MOCK`; arm the default so an unattended loop doesn't hang), then use `AskUserQuestion` to ask the user to choose:
    - **Proceed without fidelity check** — QA will log `NO_MOCK` for these CUJs and skip visual comparison; functional verification still runs.
    - **Pause** — stop the cycle here so mocks can be produced via `/design-feature` Route D (refine the affected CUJs to add mocks).
 
@@ -91,7 +156,7 @@ Mocks are normally produced during `/design-feature` Phase 0.5 alongside CUJ sha
 
    Then describe to the orchestrator that you want to add mocks for CUJ-<X>, CUJ-<Y> in prd-NNN-<slug> (Route D — refine). The orchestrator will walk through each CUJ's shape (confirming it matches what's already specified), produce the mocks, and save them under `docs/ux/<prd-dir>/`.
 
-5. If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker", and stop. The user re-invokes `/dev-cycle` after running `/design-feature` to add the mocks.
+5. Either answer closes the queue entry (transient — transcribe, act, delete). If the user chooses **Pause**, mark `docs/loop-state.md` with status `blocked`, list the missing mocks under "Blocker" citing the entry's R-NNN, and stop. The user re-invokes `/dev-cycle` after running `/design-feature` to add the mocks.
 
 ---
 
@@ -284,7 +349,7 @@ If `docs/quality/` exists: check whether any task merged this iteration touched 
 
 ## Phase 5: Status Update
 
-Spawn a `status` subagent:
+Spawn a `reporter` subagent:
 
 ```
 Prompt: "Read the full project state and update docs/status.md.
@@ -364,10 +429,14 @@ Status: <continue | done | blocked>
 - Tasks rolled back: <list of task names set back to in-progress>
 
 ## Blocker (if status = blocked)
-<description of what requires user input>
+<description of what requires user input — cite the docs/owner-queue.md
+entry (R-NNN); a blocked status without a registered entry is an
+owner-lint RED>
 
 ## Next Focus
-<what the next iteration should prioritize — include unresolved QA items>
+<what the next iteration should prioritize — include unresolved QA items.
+Planner-facing: owner decisions never park here; they live as R-NNN
+queue entries>
 ```
 
 ---
@@ -377,3 +446,5 @@ Status: <continue | done | blocked>
 - **Status = `done`**: Report to the user that all CUJs in scope are implemented and verified by QA. List what was accomplished across all iterations. Stop the loop.
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.
 - **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, what remains). The loop continues to the next iteration.
+
+Every exit report — all three statuses, and the eng-wave net line — ends with the owner-queue line from the Setup sweep: `Owner queue: +<n> filed / <m> closed (<k> defaulted) / <j> open (oldest R-NNN, <i> iters)`.

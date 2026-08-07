@@ -45,6 +45,10 @@
   escalates (/quick-fix → /dev-cycle) instead of pushing through.
 - When the loop stops "blocked", the decision is yours — answer it and re-run;
   don't hand-patch around a blocker mid-cycle.
+- Anything waiting on your decision lives in docs/owner-queue.md — oldest on
+  top; answer inline under the entry or just say it in chat (agents transcribe
+  before acting). Standing rulings accumulate in docs/rulings.md; agents cite
+  them by R-ID instead of re-asking.
 
 ## My Preferences
 <!-- Add your own instructions below -->

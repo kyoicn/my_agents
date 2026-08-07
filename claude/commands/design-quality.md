@@ -18,30 +18,7 @@ Separation of powers (why this session is structured as it is): pm + user set th
 
 3. **Inventory existing measurement assets.** Search for pre-existing gold corpora, labeled datasets, replay fixtures, and eval scripts touching this surface (golden/fixture/eval globs plus whatever the project's layout suggests). Anything built *before* this session's bar exists is **provisional by definition** — a measurement corpus is a projection of the qspec, never an independent artifact. Record the list; Phase 3.5 audits it in one pass. (Field data: skipping this cost one team roughly a third of their quality-track engineering in drip-wise reconciliation.)
 
-4. **Create the rulings queue** — `docs/quality/<slug>/rulings.md`, the single home for every owner decision this surface ever needs:
-
-   ```markdown
-   # Rulings: <slug>
-
-   Owner-decision queue and registry. Every decision an agent needs from the
-   owner is filed here — never scattered across chat, tickets, or calibration
-   files. One fact, one home: rows stay minimal (ID + one line + status);
-   link to sources, don't duplicate them. The FILE is the record, not the
-   channel: the owner may answer inline here or in conversation — whoever
-   receives a conversational ruling transcribes it into the entry before
-   acting on it. Ruled entries stay: they are the scope-ruling registry.
-
-   ---
-
-   ### R-001: <one-line question>  [pending | ruled]
-   - **Background**: <one line>
-   - **Options**: A) <...>  B) <...> — **recommended**: <letter, one-line why>
-   - **Default**: <applies if unruled and blast radius is low>
-   - **Blast radius**: <what this decision touches>
-   - **Producer**: <which track/agent is waiting on this> ← update on any handoff;
-     silent reassignment is the violation this field exists to prevent
-   - **Ruling**: <owner's answer + date — empty while pending>
-   ```
+4. **Ensure the owner-decision files exist** — `docs/owner-queue.md` (pending decisions, human-first, drained) and `docs/rulings.md` (standing-rulings registry, append-only), per the Owner Decision Protocol in `dev-cycle.md`'s Setup (deployed alongside this file); create from its templates if missing. Every owner decision this surface ever needs goes through them: pending questions → queue entries tagged `Scope: quality/<slug>`; durable answers → registry entries agents cite by R-ID. The file is the record, the channel is flexible: the owner may answer inline or in conversation — whoever receives a conversational ruling transcribes it before acting on it.
 
 5. **Detect the measurement shape** and confirm it with the user:
 
@@ -66,7 +43,7 @@ Conversational, in the main thread, like `/design-feature` discovery — no `Ask
 
 4. **Draft each dimension with an anchored scale** (1–5; anchor 1, 3, 5 minimum) where every anchor cites a real example from this session. An anchor without an example is an adjective — not allowed.
 
-5. **Rule at the class, not the item.** When a judgment generalizes ("aspect-marker ranges must include their host span"), capture it once as a class ruling in `rulings.md` and apply it to the whole category. Per-item re-asking burns the scarcest resource in the pipeline — the owner's ruling throughput. (Field-proven: owners converge on class rulings naturally; make it the default elicitation unit.)
+5. **Rule at the class, not the item.** When a judgment generalizes ("aspect-marker ranges must include their host span"), capture it once as a class ruling in `docs/rulings.md` (answered live in this conversation, so it goes straight to the registry with `Scope: quality/<slug>`) and apply it to the whole category. Per-item re-asking burns the scarcest resource in the pipeline — the owner's ruling throughput. (Field-proven: owners converge on class rulings naturally; make it the default elicitation unit.)
 
 6. **Hunt hard constraints explicitly**: "Is there anything that makes an output unacceptable *regardless* of how good it otherwise is?" (fabricated facts, leaked PII, output in the wrong language). These become auto-fail rules, not scale points.
 
@@ -155,7 +132,7 @@ The costliest documented failure mode of this command is a corpus built before t
 
 1. **Split the qspec's rules**: *lintable* (mechanically checkable — span containment, required fields, format, weights) vs *judgment* (need eyes).
 2. Spawn `evaluator`: write a **corpus linter per lintable rule** (permanent instrument assets under `judge/linters/`, not one-offs), run all of them across every provisional asset; sample-review the judgment rules (~10 items each).
-3. Present **one consolidated, class-grouped discrepancy review** — each discrepancy *class* becomes one `rulings.md` entry with a proposed ruling, default, and blast radius. Batch-process it with the owner. One audit, one review — never item-drip.
+3. Present **one consolidated, class-grouped discrepancy review** — each discrepancy *class* becomes one `docs/owner-queue.md` entry (options + recommendation + default). Batch-process it with the owner; the answers are class rulings — durable by construction — so they promote to `docs/rulings.md` on close. One audit, one review — never item-drip.
 4. Rulings in hand → file remediation as **one ENG wave**: entries per the eng-backlog schema, tagged `instrument-blocking`, `Relates-to: quality/<slug>`. The owner fires the wave with a single command — `/dev-cycle eng --for quality/<slug>` — not one dispatch per ticket.
 5. **Done-condition**: re-running every linter surfaces **no new discrepancy classes** (the convergence signal). Provisional assets then lose their provisional mark — this audit *is* the re-baseline.
 
@@ -192,5 +169,5 @@ Next: run /quality-cycle <slug> to start improving toward the bar.
 - **Don't design improvement experiments here** — that's researcher territory inside `/quality-cycle`. This session defines the bar and the instrument, nothing else.
 - **Don't build measurement corpora before the bar exists** — and treat any that predate it as provisional until Phase 3.5 re-baselines them. Perfectly replicating a deficient gold standard still fails.
 - **Don't let asset discrepancies surface drip-wise** — one audit, one consolidated class-grouped review, one ENG wave.
-- **Don't solicit owner rulings outside `rulings.md`** — conversational answers are welcome, but they're transcribed into the entry before anyone acts on them. A ruling that lives only in chat doesn't exist.
+- **Don't solicit owner rulings outside the owner-decision files** (`docs/owner-queue.md` / `docs/rulings.md`) — conversational answers are welcome, but they're transcribed before anyone acts on them. A ruling that lives only in chat doesn't exist.
 - **Don't create quality specs for deterministic behavior** — "the export button downloads a CSV" is a PRD acceptance criterion for the dev-cycle, not a quality dimension.

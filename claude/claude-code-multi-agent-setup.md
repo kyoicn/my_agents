@@ -35,7 +35,7 @@ This setup creates a team of specialized AI agents that collaborate in an autono
         ┌─────┴─────┐                                       │
        PASS   FAIL (MEDIUM+) ─── retry (≤2×) ──► Planner ───┘
         │
-       Status (report)
+       Reporter (report)
         │
        PM (review, mark CUJs done, update docs/prd/index.md)
         │
@@ -51,7 +51,7 @@ This setup creates a team of specialized AI agents that collaborate in an autono
    /triage  ──► appends Triage field to the issue block ──► /quick-fix  (small/medium) ──► commit
                                                       ├──► /dev-cycle  (large)
                                                       ├──► /design-feature  (spec-gap — feature needs design)
-                                                      ├──► ask user        (spec-conflict — report vs PRD)
+                                                      ├──► ask user        (spec-conflict — report vs PRD; headless → R-NNN in docs/owner-queue.md)
                                                       ├──► /spec-sync      (spec-stale — code is right, doc is stale)
                                                       ├──► /quality-cycle  (quality — output below bar, not broken; example joins the eval set)
                                                       └──► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
@@ -103,8 +103,53 @@ This setup creates a team of specialized AI agents that collaborate in an autono
         │
        Evaluator (holdout gate run — thresholds must hold there)
         │
-       Verdict (thresholds-met / plateau → decision menu for you /
+       Verdict (thresholds-met / plateau → decision menu filed as R-NNN /
                budget-exhausted / blocked) + your 2-minute spot-check
+               (filed as a queue stub — contents stay message-only)
+```
+
+**Owner decisions (cross-track rail):**
+
+```
+   mid-phase, shared-checkout roles           at the loop boundary, orchestrators
+   tl · planner · qa · evaluator ·            dev-cycle / quality-cycle / design-* / triage:
+   researcher · pm — file directly,           BLOCKER returns (coder's only path — worktree
+   cite R-NNN in their own outputs            writes die with branches) · blocked states ·
+   (non-blocking decisions)                   register-then-ask · session-yield leftovers ·
+              │                               plateau menus · spot-check stubs (existence
+              │                               only; contents stay message-only)
+              │                                                │
+              └───────────────────┬────────────────────────────┘
+                                  ▼
+        ┌──────────────────────────────────────────────────────────┐
+        │        docs/owner-queue.md — human-first, drained        │
+        │  admission gate: a pipeline is blocked-or-wrong without  │
+        │  the answer AND no lower authority decides it · rows     │
+        │  are pointers to the item's home track · no FYIs ·       │
+        │  oldest on top · explicit empty state                    │
+        └──────────────────────────────────────────────────────────┘
+           │                         │                         │
+           │ owner: answer slot,     │ Setup sweep (dev-cycle  │ read-only views:
+           │ chat (transcribed       │ + quality-cycle, every  │ status.md pointer
+           │ before acting),         │ iteration): armed       │ + count · every
+           │ park, or delete         │ defaults · answer       │ exit report line
+           │ (= decline, default     │ slots · owner-lint      │ "+n filed / m
+           │ applies)                │ (red auto-remediated,   │ closed / j open
+           │                         │ yellow → exit line)     │ (oldest R-NNN)"
+           └───────────┬─────────────┘
+                       ▼
+        close-time classification:
+        "does this govern cases nobody has looked at yet?"
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+       no — transient        yes — durable
+       entry DELETED         entry MOVED to docs/rulings.md
+       (outcome recorded     (append-only, agent-facing registry;
+       by the acting track;  Scope-tagged · consumers: judge/linter
+       history in git log)   errata cite their ruling · quality-cycle
+                             reads standing authorizations · class
+                             rulings govern future cases)
 ```
 
 ### The agents
@@ -118,7 +163,7 @@ Each row links to the canonical agent definition. The full instructions (Core Pr
 | [`planner`](agents/planner.md) | Task decomposer — breaks work into parallelizable tasks; stateless (rewrites `docs/tasks.md` each invocation). | `docs/tasks.md` |
 | [`coder`](agents/coder.md) | Implementation specialist — takes a self-contained task spec (what to do, which files, acceptance criteria) and ships it: writes the code, writes unit tests, runs the type checker, commits with a conventional commit message. Runs in its own git worktree, typically in parallel with other coders, in the background. Does not modify PRDs/design docs/task plans; does not write integration/E2E tests (qa's job); does not review its own code (tl's job). | Branch-scoped commits (no doc artifact) |
 | [`qa`](agents/qa.md) | QA engineer **with gate authority**. Runs tests, drives a real browser (Playwright) and/or Android device (ADB), walks each CUJ twice for flakiness detection, identifies fabrications, compares against mocks under `docs/ux/`, rolls back tasks that fail verification. | `docs/qa-report.md` |
-| [`status`](agents/status.md) | Status reporter — summarizes current project state. | `docs/status.md` |
+| [`reporter`](agents/reporter.md) | Project reporter — sole owner of the human-facing view; derives state from the sources of truth, never decides. Carries the owner-queue pointer line. (Renamed from `status` — the agent name now matches the role, not the artifact.) | `docs/status.md` |
 | [`gorilla`](agents/gorilla.md) | Adversarial exploratory tester — black-box destructive testing of the running product. No CUJ/spec context during attack; walks a 9-category attack taxonomy (input fuzzing, state corruption, races, navigation chaos, storage tampering, viewport extremes, network failure, auth probing, accessibility). Files every reproducible finding as an h3 block in `docs/issues.md`. | `docs/gorilla/<session-id>/report.md` (per-session) + `docs/gorilla/<session-id>/screenshots/` (gitignored) |
 | [`evaluator`](agents/evaluator.md) | **Measurement institution with gate authority** for graded quality. Owns eval sets (dev/holdout custody), the judge + its calibration gate (no agreement with the user's labels → no verdicts), the noise floor (within-noise deltas are inconclusive, never improvements), official runs + budget ledger, and the descriptive-only failure taxonomy. Never diagnoses causes or touches implementation. | `docs/quality/<slug>/`: `eval-report.md`, `evalset/`, `judge/`, `ledger.md` |
 | [`researcher`](agents/researcher.md) | Empirical quality scientist — diagnoses failure mechanisms from the evaluator's taxonomy + traces + code, designs ranked falsifiable experiments (prediction stated before the run) for coder to implement. Judges hypotheses (confirmed/refuted); never changes (that's the evaluator's gate). Cannot touch eval sets, judge, or qspec. | `docs/quality/<slug>/experiments.md` (append-only lab notebook) |
@@ -264,7 +309,8 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 18. **Document authority with a human apex: user intent > PRD > design docs > tasks.md**: lower documents are derived views, and *silently resolving* a contradiction is prohibited everywhere — `planner` plans per the PRD, cites the governing criterion in the task spec, and records the conflict; `tl` reconciles design docs with the changed PRDs as the diff baseline (dev-cycle Setup computes the changed-PRD list) and never authors a rationale for stale design-doc content; `coder` stops with a BLOCKER when a task spec contradicts the PRD it cites; `qa` takes acceptance criteria from PRDs only. The hierarchy is topped by **user intent** because a PRD is authoritative only as the serialization of what the user decided — so an ad-hoc user-directed change ("make the button green") outranks the PRD and creates a **spec-sync obligation** rather than a conflict: the contradicted PRD lines and mock tokens get minimal, user-confirmed, docs-only amendments (`/quick-fix` runs the check automatically after every fix; `/spec-sync` covers changes made outside it; triage's `spec-stale` classification routes deliberate deviations there). This closes both failure directions at once: stale design docs can no longer override fresh PRDs (the post-mortem case), and stale PRDs can no longer trigger revert wars against intentional changes (the green-button case). The sole carve-out to pm's PRD ownership is spec-sync's amendment power — user-present, line-scoped, commit-trailed.
 19. **Graded quality is its own loop, with separation of powers so it can't Goodhart itself**: statistical output quality (summaries, rankings, extractions, pipelines) breaks the dev-cycle's premise of deterministic, binary, cheap verification — so it gets a parallel spec–measure–improve triangle where **the bar-setter, the measurer, and the improver are never the same agent**: pm + user calibrate the bar into `qspec.md` (anchored scales where every anchor cites a real example — the golden-examples analog of mocks-in-lockstep); `evaluator` measures with validity tripwires that halt rather than fabricate (judge calibration gate against the user's labels, noise floor from double-run baselines, holdout custody, budget ledger); `researcher` + `coder` improve via one-mechanism-per-iteration experiments, with the append-only lab notebook as the sanctioned stateful exception (negative results are load-bearing — an improver with amnesia re-runs its failures). Generality comes from measurement-shape dispatch (absolute-graded / comparative / ground-truth / proxy), not per-domain instructions — shape references grow on pilot evidence, not speculation. The loop's verdicts include **plateau as a first-class ending**: k experiments without accepted improvement is a product tradeoff returned to the user, not a failure to push through. qa keeps the deterministic envelope and never vibe-checks generated content; dev-cycle runs a smoke-eval when tasks touch quality-surface files; the per-cycle user spot-check is the standing human anchor that keeps an autonomous improver aimed at the user's bar rather than the judge's drift.
 20. **Measurement corpora are projections of the qspec, never independent artifacts** (first field cycle, F1–F4): a gold corpus built before the bar exists is provisional by definition — "perfectly replicating a deficient gold standard still fails." `/design-quality` therefore inventories pre-existing measurement assets up front and audits them in **one consolidated pass** right after the qspec lands (Phase 3.5: lint every mechanical rule via per-rule corpus linters, class-group the discrepancies, one rulings batch, one ENG wave) instead of letting mismatches surface drip-wise. Corpus changes thereafter follow the **Corpus Revision Protocol** (versioned baselines, carry-over snapshots, monotone ratchet floors, errata citing their authorizing ruling — never silent edits). Honest caveat from the field ledger: whether an up-front protocol would have prevented the original incidents, or incident-driven growth is what made it fit, is genuinely unknown — both readings are recorded.
-21. **Owner throughput is the pipeline's scarcest resource — budget it like one** (first field cycle, F5, F7–F13): every owner decision lives in one queue (`docs/quality/<slug>/rulings.md`: background, options + recommendation, default, blast radius, producer; answerable inline or in conversation — the file is the record, not the channel), and `status.md`'s Owner Action Queue aggregates everything currently waiting on the owner with its **current producer** named (a handoff that doesn't update the row is the violation). Coordination artifacts hold pointers, not narratives — *one fact, one home; queue rows are ID + one line + status word* — because temporary artifacts drift into second state stores by default. Eng dispatch is owner-carried by default in **waves** (`/dev-cycle eng [--for <area>]`: one command drains a batch, exit report leads with the closed/filed/blocking net line), with orchestrator auto-dispatch only under a standing authorization recorded as a ruling. Reports separate change-narration from action-requests so the ask is never buried in the audit trail.
+21. **Owner throughput is the pipeline's scarcest resource — budget it like one** (first field cycle, F5, F7–F13): every owner decision lives in one queue (now project-level `docs/owner-queue.md` — decision #22; the first field cycle's per-slug `rulings.md` was this decision's prototype; answerable inline or in conversation — the file is the record, not the channel), and the reporter's `status.md` carries a pointer + count to it (the queue file itself names each entry's **current producer** — a handoff that doesn't update it is the violation). Coordination artifacts hold pointers, not narratives — *one fact, one home; queue rows are ID + one line + status word* — because temporary artifacts drift into second state stores by default. Eng dispatch is owner-carried by default in **waves** (`/dev-cycle eng [--for <area>]`: one command drains a batch, exit report leads with the closed/filed/blocking net line), with orchestrator auto-dispatch only under a standing authorization recorded as a ruling. Reports separate change-narration from action-requests so the ask is never buried in the audit trail.
+22. **Owner decisions ride a cross-track rail: a drained queue + a standing-rulings registry, split by lifecycle** (third field retro — the owner: "I have to hunt everywhere for the things that need my attention"): `docs/owner-queue.md` holds everything currently blocked on the owner and nothing else — human-first format (headline question, options with exactly one recommendation, a default with an arming trigger, an answer slot), oldest on top, written in the working language, closed entries deleted (history = git log, the issues.md doctrine — the queue trends toward empty); `docs/rulings.md` holds standing rulings only — append-only, agent-facing, cited by R-ID (one namespace; entries keep their number when promoted). Classification happens **at close, not at filing** — *does this answer govern cases nobody has looked at yet?* — because you often can't know at filing whether an answer will generalize. An **admission gate** keeps it a queue, not a feed: an item enters only when a pipeline is blocked-or-wrong without the answer AND no lower authority (planner ladder, triage table, qspec thresholds, ENG priority) decides it — no FYIs; rows are pointers to the item's home track, never copies. Every shared-checkout role carries a push-side **registration duty** (worktree agents excepted: coder's channel stays `BLOCKER:` and the orchestrator registers, because branch writes die with rejected branches); decision-class AskUserQuestions are registered before being asked, so declined and session-killed questions survive; content-confidential items (holdout spot-checks) get existence-stubs with a reconstruction path while contents stay message-only. Drainage is designed in, not hoped for: transient entries arm defaults the per-iteration Setup **sweep** applies; every exit report carries the queue delta + oldest-age line; `scripts/owner-lint.sh` enforces zero *marked* scatter (a vocabulary ratchet, stated as such) with RED defined as ownerless-remediable so the pipeline never blocks on hygiene. Queue size thereby becomes a diagnostic: steady growth means some pipeline is missing a rule and asking where it should be deciding. Alongside, the `status` agent was renamed **`reporter`** — every other agent is named for its role, this one was named for its artifact, and the word collided with three unrelated "status" vocabularies; its charter is now explicit (sole owner of the human-facing view; derives, never decides; its owner section is a pointer + count, never a second record).
 
 ---
 
@@ -280,7 +326,7 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 │   ├── planner.md                  # Task decomposition agent
 │   ├── coder.md                    # Implementation agent (writes code + unit tests; runs in a worktree)
 │   ├── qa.md                       # QA / testing agent (spec-driven verification)
-│   ├── status.md                   # Status reporter agent
+│   ├── reporter.md                 # Project reporter agent (human-facing view; renamed from status)
 │   ├── gorilla.md                  # Adversarial exploratory test agent (black-box destructive)
 │   ├── evaluator.md                # Quality measurement institution with gate authority (judge, eval sets)
 │   └── researcher.md               # Empirical quality scientist (diagnosis, experiments, lab notebook)
@@ -316,7 +362,11 @@ Generated by the loop in any project that uses this setup:
     │   └── prd-NNN-<slug>-mockups/
     │       └── cuj-<id>-<state>.html  # mocks produced by pm during /design-feature
     ├── tasks.md                    # planner output; overwritten each cycle
-    ├── status.md                   # status agent output
+    ├── status.md                   # reporter agent output (file keeps its historical name)
+    ├── owner-queue.md              # everything currently waiting on the owner — human-first,
+    │                               # drained (closed entries leave the file; history in git log)
+    ├── rulings.md                  # standing-rulings registry — append-only, agent-facing,
+    │                               # entries promoted from the queue at close, cited by R-ID
     ├── qa-report.md                # QA agent output
     ├── qa-artifacts/<run-id>/<cuj-id>/run{1,2}/    # <run-id> = iter<N>-<HH-MM-SS>
     │   └── *.png                   # screenshots from the QA walks
@@ -334,8 +384,6 @@ Generated by the loop in any project that uses this setup:
     │       ├── evalset/{dev,holdout}/  # evaluator's custody; holdout never visible to improvers
     │       ├── judge/              # judge prompts per dimension + calibration record,
     │       │                       # linters/ (one per lintable rule), experiment-scoring.md
-    │       ├── rulings.md          # owner-decision queue + registry (pending → ruled;
-    │       │                       # the file is the record, the channel is flexible)
     │       ├── eval-report.md      # evaluator output: scores × strata, taxonomy, gate verdicts
     │       ├── experiments.md      # researcher's append-only lab notebook
     │       ├── ledger.md           # eval-run budget ledger
@@ -512,7 +560,11 @@ To set up on a new machine:
 3. **Install the Playwright MCP** per the Prerequisites section above (and the Android SDK platform-tools if you'll be testing Android targets).
 4. **Optional**: merge any pre-existing `~/.claude/CLAUDE.md` content with the repo's version (the deploy script will overwrite the symlink target; preserve any other instructions you had).
 
-If you'd rather not symlink and want a static copy, just `cp -r claude/agents claude/commands claude/CLAUDE.md claude/settings.json ~/.claude/`. Trade-off: edits to the repo no longer flow into `~/.claude/` automatically.
+If you'd rather not symlink and want a static copy, just `cp -r claude/agents claude/commands claude/CLAUDE.md claude/settings.json ~/.claude/`. Trade-off: edits to the repo no longer flow into `~/.claude/` automatically. (After the `status` → `reporter` rename, copied installs must also delete the stale `~/.claude/agents/status.md`.)
+
+### Migrating a deployed project to the owner-decision rail
+
+One-time, for projects that predate design decision #22: merge each `docs/quality/<slug>/rulings.md` into the project-level files — pending entries → `docs/owner-queue.md`, ruled entries → `docs/rulings.md` (IDs kept, `Scope: quality/<slug>` added; renumber via a mapping table only on collision). Any interim owner-inbox file merges the same way. Legacy pending-owner scatter elsewhere (loop-state "Next Focus" items, ad-hoc STATUS action-queue sections, notes inside ENG entries) becomes R-NNN pointers; `scripts/owner-lint.sh` — generated by the next `/dev-cycle` Setup — turns any stragglers red. Archive superseded per-slug rulings files with a header pointer rather than deleting them: their ruled entries are already in the registry, and old errata citations stay resolvable.
 
 ### Bootstrap without the repo
 
@@ -524,7 +576,7 @@ Then verify with:
 - `/user:planner` — should respond as planner
 - `/user:coder` — should respond as implementation specialist (writes code + unit tests; refuses to modify PRDs / design / tasks)
 - `/user:qa` — should respond as QA
-- `/user:status` — should generate status report
+- `/user:reporter` — should respond as the project reporter and generate `docs/status.md` (the artifact keeps its name; the agent was renamed from `status`)
 - `/user:gorilla` — should respond as the gorilla testing agent (refuses to read PRDs/code before attacking)
 - `/user:evaluator` — should respond as the quality-measurement institution (refuses to fabricate scores or diagnose causes)
 - `/user:researcher` — should respond as the quality scientist (refuses to touch eval sets, judge assets, or the qspec)

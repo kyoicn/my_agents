@@ -106,6 +106,7 @@ For spec-conflict issues, additionally explain:
 - What the report claims the behavior should be
 - The current implementation (does it follow the PRD or not?)
 - Do NOT decide which side is correct — present both and ask the user to resolve
+- **Headless invocation** (orchestrated, no live user): don't leave "ask user" dangling — register the conflict as a `docs/owner-queue.md` entry per the Owner Decision Protocol (`dev-cycle.md` Setup), options = the two readings, no armed default (spec conflicts are the owner's), and cite the R-NNN in the Triage field's Recommended action
 
 ### 4. Update docs/issues.md — append a Triage field to the issue block
 

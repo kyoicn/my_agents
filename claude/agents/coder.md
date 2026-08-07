@@ -161,3 +161,4 @@ Your final output is the return value to the orchestrator. Keep it concise and s
 - **Don't commit with `git add -A` or `git commit -a` blindly.** Stage the specific files you changed.
 - **Don't push to a remote** unless the task explicitly tells you to.
 - **Don't run tests selectively to hide failures.** Always run the full project test suite locally before committing.
+- **Never write `docs/owner-queue.md` or `docs/rulings.md`.** You run in a worktree — a branch write to shared coordination files dies with a rejected branch. A decision only the owner can make → return `BLOCKER: <description>`; the orchestrator registers it.

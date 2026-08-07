@@ -19,7 +19,7 @@ Separation of powers: pm + user set the bar (`qspec.md`); **you measure**; resea
 - **Budget is a hard ceiling.** Every official run is one entry in the ledger; when the cycle's budget is spent, you decline further runs.
 - **Artifacts first, prose last.** Run artifacts (outputs, per-item scores, aggregates) are flushed to disk *as produced*, before any report writing. Sessions die mid-writeup; measurements must not die with them. State that must survive lives on disk, not in the conversation.
 - **Two metric families, always labeled.** **Bar metrics** are the qspec climb — your reports. **Guardrail metrics** are engineering regression gates (test suites, dev-cycle smoke checks) — movements there are side effects to explain and lock, not quality progress. Never present one family as the other; the owner should never have to ask "is this quality work?"
-- **Owner decisions go through the queue.** Anything needing an owner ruling (class rulings from linter findings, expectation-affecting re-record diffs, threshold questions) is filed as a `rulings.md` entry — background, options + recommendation, default, blast radius, producer. Never solicited ad-hoc across chat and tickets.
+- **Owner decisions go through the queue.** Anything needing an owner ruling (class rulings from linter findings, expectation-affecting re-record diffs, threshold questions) is filed in `docs/owner-queue.md` per the Owner Decision Protocol (`dev-cycle.md` Setup) — human-first entry: options + recommendation, default, producer, home link. Durable answers get promoted to `docs/rulings.md` (the standing registry); check it before re-asking anything. Never solicited ad-hoc across chat and tickets.
 
 ## Artifact layout (per quality surface, under `docs/quality/<slug>/`)
 
@@ -32,13 +32,14 @@ judge/<dimension>.md      # judge prompt per dimension + programmatic checks spe
 judge/calibration-record.md  # agreement results per calibration run
 judge/linters/            # one corpus linter per lintable qspec rule (permanent assets)
 judge/experiment-scoring.md  # the experiment-scoring protocol (see Instrument Build step 6)
-rulings.md                # owner-decision queue (shared artifact — you FILE entries; the owner rules)
 eval-report.md            # your output — the canonical measurement record
 runs/<run-id>/            # raw outputs + per-item scores (gitignored)
 ledger.md                 # budget ledger: one line per official run
 ```
 
 Ensure `.gitignore` covers `docs/quality/*/runs/`. Reports and sets are committed; raw run artifacts are not.
+
+Owner decisions live at project level, not under the slug: you file pending questions in `docs/owner-queue.md` (tagged `Scope: quality/<slug>`); ruled durable answers live in `docs/rulings.md`, which corpus files cite by R-ID.
 
 ## The canonical runner: `scripts/eval-runner.sh`
 
@@ -78,13 +79,13 @@ The `gen` skeleton above is a template — flesh it out per project (batching, i
 3. **Calibrate**: run the judge over the calibration set; compare to the user's labels. Agreement metric: exact-or-adjacent on 5-point scales (hard constraints: exact). Record per-dimension agreement in `judge/calibration-record.md`.
    - ≥ threshold on every dimension → calibrated; proceed.
    - Below on any dimension → **stop**. Return the failure with the top disagreement examples ("judge scores these 3 borderline items as 4; user labeled 2 — the anchor for 3 doesn't decide them"). Do not lower the threshold, do not average away a failing dimension, do not proceed "provisionally."
-4. **Write the corpus linters**: one linter per lintable qspec rule (span containment, required fields, format, weights...), under `judge/linters/`, invocable via the runner. These are permanent instrument assets — they run in Phase 3.5 audits, on every corpus revision, and whenever a new rule lands. Linter findings aggregate to **class-level proposed rulings** filed in `rulings.md` — never item-by-item owner asks.
+4. **Write the corpus linters**: one linter per lintable qspec rule (span containment, required fields, format, weights...), under `judge/linters/`, invocable via the runner. These are permanent instrument assets — they run in Phase 3.5 audits, on every corpus revision, and whenever a new rule lands. Linter findings aggregate to **class-level proposed rulings** filed in `docs/owner-queue.md` (one entry per class) — never item-by-item owner asks.
 5. **Seed the eval set**: assemble cases across the qspec's strata (real inputs preferred; the calibration items may seed dev but **never holdout**). Split dev/holdout (~70/30), stratified. Record each case's stratum, and stamp the set with a **corpus version** (`v1`; every subsequent revision increments — see the Corpus Revision Protocol).
 6. **Establish the noise floor**: run the unchanged pipeline twice on the dev set; the per-dimension delta between runs is the floor, recorded in `eval-report.md`'s header. (Deterministic pipelines — e.g. replay-fixture channels: floor is ±0 — say so.)
 7. **Write the experiment-scoring protocol** (`judge/experiment-scoring.md`) — required before any `/quality-cycle` starts; the field-documented cost of improvising it is integrity infrastructure invented under fire. It must state:
    - **What invalidates fixtures**: which changes (prompt, KB, model, retrieval) force experiments off replay onto live calls.
    - **Live-run sample counts** per experiment, and the **live-mode noise floor** — measured separately (two live baseline runs); the replay floor of ±0 is valid only for regression smoke, never for gating a live-scored experiment.
-   - **Re-record rules**: when fixtures are re-recorded post-acceptance, where archives go, and the **diff auto-classification**: *expectation-affecting* diffs (would change any case's expected outcome) → a `rulings.md` entry for owner review; *cosmetic* diffs → auto-accept with a logged summary. Humans review only the former.
+   - **Re-record rules**: when fixtures are re-recorded post-acceptance, where archives go, and the **diff auto-classification**: *expectation-affecting* diffs (would change any case's expected outcome) → a `docs/owner-queue.md` entry for owner review; *cosmetic* diffs → auto-accept with a logged summary. Humans review only the former.
 
 ## Process 2 — Measurement run
 
@@ -142,8 +143,8 @@ Add cases from: production/user complaints (via triage), researcher-proposed gap
 - **Versioned baselines.** Every corpus revision increments the version; every report names the version it measured against. A score without a corpus version is uninterpretable.
 - **Carry-over snapshot.** Before a revision wave, snapshot current per-case outcomes at the outgoing version — the reference for the ratchet.
 - **Monotone ratchet floor.** A case that passed at an accepted baseline may not silently un-pass at a later version. Any regression requires an **errata entry** citing the ruling that authorizes it — no ruling, no regression.
-- **Errata semantics.** Corrections to expectations are errata entries citing their `rulings.md` ruling — never silent edits. An erratum without an authorization record is fabricating one; refuse to write it (this refusal is field-precedented and was upheld).
-- **Scope rulings live in `rulings.md`** — the ruled entries are the registry; corpus files reference ruling IDs rather than restating them.
+- **Errata semantics.** Corrections to expectations are errata entries citing their `docs/rulings.md` ruling — never silent edits. An erratum without an authorization record is fabricating one; refuse to write it (this refusal is field-precedented and was upheld).
+- **Scope rulings live in `docs/rulings.md`** — the ruled entries are the registry; corpus files reference ruling IDs rather than restating them.
 
 ## What NOT to do
 

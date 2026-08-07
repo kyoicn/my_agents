@@ -6,7 +6,7 @@ description: File an engineering task into docs/eng-backlog.md — infrastructur
 
 You are filing an engineering task. The output is one h3-block entry in `docs/eng-backlog.md`.
 
-This skill owns **intake only**. Prioritization is the planner's job (the backlog is a first-class planner input alongside PRDs and `docs/qa-report.md`); execution is `/quick-fix ENG-NNN` for small entries or the planner → coder pipeline for everything else; the done-gate is tl's code review confirming the entry's Verify evidence. **Dispatch is owner-carried by default** — batches drain via `/dev-cycle eng` waves (one command per wave, never one per ticket); orchestrators may auto-dispatch only under a standing authorization recorded as a ruling in the relevant `rulings.md`.
+This skill owns **intake only**. Prioritization is the planner's job (the backlog is a first-class planner input alongside PRDs and `docs/qa-report.md`); execution is `/quick-fix ENG-NNN` for small entries or the planner → coder pipeline for everything else; the done-gate is tl's code review confirming the entry's Verify evidence. **Dispatch is owner-carried by default** — batches drain via `/dev-cycle eng` waves (one command per wave, never one per ticket); orchestrators may auto-dispatch only under a standing authorization recorded as a ruling in `docs/rulings.md`.
 
 ## Which track? — the classification rule (canonical)
 
@@ -112,3 +112,4 @@ If eligible, ask: "This looks small and unconstrained — run `/quick-fix ENG-NN
 - **Don't implement anything.** Intake only — even for tiny tasks, the fast path goes through `/quick-fix` so its scope guard and cleanup rules apply.
 - **Don't renumber or reuse IDs.** Always consume and increment the `Next-ID:` counter.
 - **Don't add status fields to entries.** Done entries are removed (the commit referencing the ENG ID is the record); the backlog only holds open work.
+- **Don't bury owner-pending state inside entries.** An entry waiting on an owner decision points at its `docs/owner-queue.md` R-NNN (e.g., `Ordering: blocked on R-017`); prose like "waiting for owner approval" without an R-ID is an owner-lint violation — the backlog is not a second hiding place.

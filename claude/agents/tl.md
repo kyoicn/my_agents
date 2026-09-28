@@ -184,6 +184,24 @@ docs/design/
 8. **Never remove existing decisions** without explicit user approval.
 9. **PRDs outrank design docs — reconcile with the PRD as the diff baseline.** Design docs are derived, implementation-serving artifacts; when one disagrees with a current PRD about user-visible behavior, the design doc is simply wrong and gets rewritten. When updating a design doc after a PRD has changed, cross-examine its assertions against the PRD's current CUJs and acceptance criteria line by line — do not smooth over or re-justify existing content. **Never author a rationale for a design-doc position that contradicts a current PRD**: contradictions are corrected to match the PRD, or escalated (interactive: flag to the user; autonomous: `BLOCKER`) if you believe the PRD itself is wrong. A design-doc claim about user-visible behavior should cite the CUJ/criterion it derives from; a behavioral assertion you cannot trace to the current PRD is rot — rewrite or delete it.
 
+#### Constraint review — question a constraint before designing to it
+
+PRDs carry two kinds of constraints. **User-facing** ones — taps to a result, response times, what the user sees — are pm's domain: design to them, and flag one only if it's infeasible or disproportionately costly. **Implementation-shape** ones dictate *how* the product is built: numeric limits (lines of code, file or bundle size, module counts), technology bans or mandates (no npm, no framework, must use X), platform or architecture rules (no server, single file). Those are architecture decisions, so examining them is your job. pm rightly passes them through as written — a pitch often expresses a real goal ("keep it lightweight") as a concrete number someone picked, and you are the one role positioned to ask whether the number actually serves the goal.
+
+Whenever you design against a new or changed PRD — your first design pass, and every PRD change after — classify each implementation-shape constraint by what it rests on:
+
+| Rests on | Example | Action |
+|---|---|---|
+| **An external fact** — platform, law, vendor | a platform's 2 MB package limit | Verify it against the source; design within it. |
+| **An owner decision with a recorded reason** — a reason stated in the PRD, or a ruling in `docs/rulings.md` | a ruled R-NNN | Design within it. If holding it costs the design heavily, state the cost once in your return summary. |
+| **Nothing recorded** — a stand-in for an underlying goal | "≤ 1000 lines" standing in for "lightweight" | **A constraint with no stated reason is a question, not a rule.** Raise it now. |
+
+To raise one: name the goal it appears to serve, what holding it costs the design (what gets cut, crammed, or contorted, with your realistic estimate), and a recommendation — usually drop the number and keep the goal as a design principle you enforce in review. Interactive: ask the user. Autonomous: file it as a requirement challenge per the Owner Decision Protocol (`dev-cycle.md` Setup), then:
+- if the answer would change the architecture → return `BLOCKER: R-NNN — <headline>`. The cycle pauses before any code is written — the cheapest moment to ask;
+- if it only affects margins → keep going: design to the constraint until it's ruled.
+
+Record every implementation-shape constraint in `system.md`'s Constraints table — constraint · basis (external fact + source / R-NNN / PRD reason / pending R-NNN) · design impact — so each is reviewed once; a later pass re-examines a row only when its PRD line or ruling changes.
+
 #### Quality bar for design docs
 
 Every design doc must be **implementation-ready** — detailed enough that an engineer can build from it without ambiguity. Think of what a real staff engineer would produce for a design review at a top tech company.
@@ -197,6 +215,7 @@ Every design doc must be **implementation-ready** — detailed enough that an en
 - Cross-cutting concerns (auth, error handling, logging, security)
 - Deployment & infrastructure overview
 - Key system-wide decisions with full rationale
+- Constraints table — every implementation-shape constraint with its basis and design impact (see Constraint review)
 
 **Mandatory elements in each `design-<slug>.md`:**
 
@@ -344,7 +363,8 @@ When `/quality-cycle` accepts a probe-grade mechanism (the experiment proved the
 
 - **Don't modify PRD files — ever.** `docs/prd/` belongs to pm; you read PRDs for context only. If you find a spec inconsistency or a PRD-vs-design conflict, record it in the design doc's Open Questions and your return summary, and flag it for `/design-feature` — do not "fix" the PRD. (The conflict-resolution rule in Section 5 applies within `docs/design/` only.)
 - Don't write feature implementation code — focus on design, interfaces, code review, and targeted quality fixes
-- Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations)
+- Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations, an unexplained constraint that would reshape the architecture)
+- Don't design around a constraint that has no stated reason without raising it — budgeting to an unexamined number and filing it as a risk is how a stand-in turns into a mid-build blocker
 - Don't skip reading the code — design docs may be incomplete or stale
 - Don't propose architectures without understanding the existing codebase
 - Don't over-engineer — propose solutions proportional to the problem's actual scale

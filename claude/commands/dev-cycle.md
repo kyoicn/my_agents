@@ -65,7 +65,7 @@ Every subagent prompt this skill sends (tl, planner, qa, reporter, pm, and every
 
 This is what lets role definitions keep their interactive behaviors (planner's plan approval, pm's clarifying questions) without deadlocking the loop: the roles define the craft, the invocation defines the interaction contract, and human judgment re-enters at the loop boundary instead of mid-subagent.
 
-**If any subagent's return contains `BLOCKER:`**, stop the cycle, register the blocker as a `docs/owner-queue.md` entry (per the Owner Decision Protocol below — this is the only registration path for worktree agents), set `docs/loop-state.md` status to `blocked` with the blocker text + its R-NNN under "Blocker", and notify the user — the same handling as Phase 1's tl blocker path, generalized to every phase.
+**If any subagent's return contains `BLOCKER:`**, stop the cycle, register the blocker as a `docs/owner-queue.md` entry (per the Owner Decision Protocol below — this is the only registration path for worktree agents; when a shared-checkout agent already filed the entry and its BLOCKER cites the R-NNN, cite that one instead of registering a duplicate), set `docs/loop-state.md` status to `blocked` with the blocker text + its R-NNN under "Blocker", and notify the user — the same handling as Phase 1's tl blocker path, generalized to every phase.
 
 ### Owner Decision Protocol
 
@@ -102,6 +102,14 @@ what it unblocks. Details: [<home item>](<link into the owning track>).
 
 > **your answer:**
 ```
+
+**Requirement challenges** — entries asking whether a requirement should stand: a constraint with no recorded reason, or a PRD limit the build can't meet as specified. Whoever raises one (tl at architecture review, the orchestrator registering a coder's `BLOCKER:`, qa, the planner) uses the entry format above plus four rules:
+1. The headline questions the constraint itself — "Drop the 1000-line cap?", not "How do we fit in 1000 lines?"
+2. The context names where the constraint came from (its PRD line, plus its origin if known — e.g. a pasted brief) and its reason, or "none recorded"; what holding it costs; and the goal it appears to stand in for.
+3. The options always include dropping it (keeping the underlying goal as a design principle when there is one), alongside keeping it as a soft target, keeping it as a hard limit, and any real design alternatives.
+4. Every number in an option states its basis ("~1500 = projected total at the current design") — no value appears out of nowhere.
+
+No armed default: a ruling on a requirement is durable — it moves to `docs/rulings.md` with `Scope: prd-NNN`. A ruling that changes the requirement routes to pm: when the sweep processes the answer, spawn a pm subagent to amend exactly that PRD line, citing the R-ID (the ruling is the approval), so Phase 1 designs against the amended spec.
 
 **`docs/rulings.md` — the registry.** Standing rulings only: class rulings, standing authorizations, threshold decisions — answers that govern cases nobody has looked at yet. Append-only, agent-facing, entries never deleted (agents and errata cite them by R-ID). Same ID namespace as the queue; an entry keeps its number when promoted. Registry entry = question + context + `**Scope**: <project | quality/<slug> | prd-NNN | eng>` + `**Ruling**: <answer + date (+ "defaulted" when it armed)>`.
 
@@ -180,6 +188,14 @@ rationale for existing design-doc content that conflicts with the
 PRD — correct it, or return BLOCKER if you believe the PRD itself
 is wrong.
 
+SECOND — constraint review (Section 5 of your role definition), for
+the same PRDs: classify every implementation-shape constraint
+(numeric limits, technology bans/mandates, platform rules) by what
+it rests on, and record it in system.md's Constraints table. A
+constraint with no recorded reason is a question, not a rule: file
+it as a requirement challenge — and return BLOCKER citing its R-NNN
+if the answer would change the architecture.
+
 Then: are there design gaps relative to the PRDs? Are there
 design decisions that need to be made before the next round of
 implementation? Read docs/prd/index.md, active PRDs under docs/prd/,
@@ -199,7 +215,8 @@ Return a summary of:
 1. What design decisions were made or updated
 2. What ENG entries you filed (IDs), if any
 3. What constraints the planner should know about
-4. Any blockers that require user input before work can proceed"
+4. Any blockers that require user input before work can proceed
+5. Requirement challenges filed (R-NNN), if any"
 ```
 
 If tl reports a **blocker requiring user input**, stop the loop, update `docs/loop-state.md` with status `blocked`, and notify the user with the blocker details.

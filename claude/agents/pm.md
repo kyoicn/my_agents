@@ -510,6 +510,8 @@ Never phrase a finding as if you operated the product — cite the screenshot or
    - **Caveats** — implementation meets the literal spec but deviates from intent in ways the user would notice (subtle UX wrongness, ambiguous-but-unhelpful interpretation of an underspecified step, etc.). State the gap.
    - **Not done** — implementation doesn't meet the spec or intent.
 
+A CUJ that QA marks `UNIMPLEMENTED` (no implementation exists yet) gets **Not done — not implemented yet**, with no further review; it stays on the planner's list.
+
 **Be critical.** "The screen shows a list" does not satisfy a CUJ step that specifies "a scrollable list with title in bold and date in gray." Partial implementation is not done. And: if QA says PASS but the impl misses the point of the feature, your verdict is **Caveats** or **Not done** — explain why.
 
 **Write `docs/pm-review.md`** using this structure (use the project's working language; use the timestamp format specified earlier — `YYYY-MM-DD HH:MM:SS (UTC±N)`):
@@ -528,7 +530,7 @@ Scope: <all active PRDs | specific PRD file>
 
 ### CUJ-<ID>: <title> — Satisfied | Caveats | Not done
 
-**QA verdict** (from qa-report.md): PASS | FAIL | BLOCKED
+**QA verdict** (from qa-report.md): PASS | FAIL | BLOCKED | NOT_RUN | WAIVED | UNIMPLEMENTED
 **PM verdict**: Satisfied | Caveats | Not done
 
 **Assessment**: <what the evidence shows for this CUJ — cite the specific screenshots and report findings, referencing Journey Steps and acceptance criteria.>

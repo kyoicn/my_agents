@@ -115,7 +115,7 @@ For each acceptance criterion that lacks test coverage:
 - Use the project's existing E2E/integration test framework (Playwright, Cypress, etc.). If none exists, recommend one to the user before proceeding.
 - Keep tests focused — one acceptance criterion per test
 - Name tests clearly: `CUJ-<ID>: <what is being verified>`
-- Do not write tests for unimplemented CUJs
+- Do not write tests for `UNIMPLEMENTED` CUJs (the strict test is in Step 7)
 
 ### 6. Run all tests
 
@@ -127,6 +127,10 @@ After writing new tests, run the full suite:
 ### 7. Manual product verification
 
 **This step is mandatory.** Automated tests passing is not sufficient.
+
+**Which CUJs to walk.** Every in-scope CUJ except those that are `UNIMPLEMENTED` — a strict test, because the label excludes the CUJ from the verdict: its entry point (the screen, route, or command its Preconditions name) does not exist in the product, **and** no task in this iteration's `docs/tasks.md` targets it. If *anything* for the CUJ exists — a partial screen, a stub, a task that claimed it — walk it: it gets `PASS` or `FAIL` like any other, and a stub presented as the feature is a `FABRICATION`.
+
+**Incomplete walks.** If a step's artifacts are missing at the end of a walk (a capture failed, the walk was cut short), re-walk that step before writing the report. Only a step still unverifiable after the re-walk is `NOT_RUN` — with its reason — which makes the CUJ `FAIL` as incomplete verification (see Overall verdict).
 
 **Artifact path: `<run-id>` is `iter<N>-<HH-MM-SS>`** where N is the iteration counter from `docs/loop-state.md` (default `1` if loop-state doesn't exist) and `HH-MM-SS` is the local time when this QA invocation started (`date "+%H-%M-%S"`). Each QA invocation gets its own bucket so retries within the same iteration don't overwrite earlier walks. Example: `docs/qa-artifacts/iter3-14-23-45/cuj-3/run1/00-initial.png`. Capture `<run-id>` once at the start of Step 7 and reuse it for every screenshot path in this invocation. Ensure `.gitignore` excludes `docs/qa-artifacts/` (append if missing) — walk artifacts are read from disk (by you and by pm's review) and never committed.
 
@@ -782,7 +786,7 @@ Scope: <all active PRDs | specific PRD file>
 
 ## Verdict: PASS | FAIL | BLOCKED
 
-<One-line summary of why. If BLOCKED, name the missing capability. If FAIL, count of bugs by severity.>
+<One-line summary of why. If BLOCKED, name the missing capability. If FAIL, count of bugs by severity. Always name any CUJ still unverified after its re-walk (`incomplete verification: CUJ-<ids>`) and any UNIMPLEMENTED CUJs.>
 
 ## Automated Test Summary
 - Total tests: X (pre-existing: X, new: X)
@@ -797,9 +801,9 @@ Scope: <all active PRDs | specific PRD file>
 
 ## Per-CUJ Verification
 
-### CUJ-<ID>: <title> — PASS | FAIL | BLOCKED | NOT_RUN | WAIVED
+### CUJ-<ID>: <title> — PASS | FAIL | BLOCKED | NOT_RUN | WAIVED | UNIMPLEMENTED
 
-(If `WAIVED`: state the reason and when it must be revisited. If `BLOCKED`: state the missing capability. If `NOT_RUN`: state why no walk was attempted.)
+(If `WAIVED`: state the reason and when it must be revisited. If `BLOCKED`: state the missing capability. If `NOT_RUN`: state why no walk was attempted. If `UNIMPLEMENTED`: state which entry point is absent — the rest of the CUJ section is omitted.)
 
 #### Acceptance Criteria
 | # | Criterion | Coverage | Result (run1) | Result (run2) | Final |
@@ -870,6 +874,7 @@ Three orthogonal dimensions describe verification state. Use uppercase everywher
 | `BLOCKED` | Could not be verified — required tool/capability missing (e.g., browser MCP not installed). Never silently downgrade to "I read the source." |
 | `NOT_RUN` | Verification was not attempted (artifacts missing, walk skipped, etc.). Distinct from BLOCKED: BLOCKED means "I couldn't"; NOT_RUN means "I didn't." |
 | `WAIVED` | Deliberately deferred this iteration. Requires a stated reason and a condition for revisiting. Does not count as FAIL in the overall verdict. |
+| `UNIMPLEMENTED` | CUJ-level only. Nothing for this CUJ exists yet (the strict test in Step 7). Not a failure of anything built: excluded from the overall verdict, and still unfinished work — the planner schedules it, pm judges it `Not done`. |
 
 ### Coverage (per acceptance criterion only)
 
@@ -914,9 +919,12 @@ The overall report verdict is derived mechanically. There is no judgment call.
 | Any CUJ has Result `BLOCKED` | `BLOCKED` |
 | Any bug exists with severity ≥ `MEDIUM` (any kind) | `FAIL` |
 | Any bug exists with severity `LOW` only (no MEDIUM+ anywhere) | `FAIL` |
-| Zero bugs found; all in-scope CUJs `PASS` or `WAIVED` | `PASS` |
+| No bugs, but a CUJ is `FAIL` from incomplete verification (a step still `NOT_RUN` after its re-walk) | `FAIL` (incomplete verification) |
+| Otherwise — zero bugs; every in-scope CUJ `PASS`, `WAIVED`, or `UNIMPLEMENTED` | `PASS` |
 
-In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop uses severity to decide whether to retry the inner QA loop or advance with bugs queued — see [dev-cycle.md](../commands/dev-cycle.md) Phase 4. The QA verdict itself does not soften based on severity.
+Check the rows in order; the first match is the verdict. The table covers every case — if you find yourself between rows, re-read the per-CUJ Results, not the table.
+
+In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED; an unfinished walk ⇒ FAIL; UNIMPLEMENTED CUJs don't count.** The dev-cycle loop uses severity to decide whether to retry the inner QA loop or advance with bugs queued — see [dev-cycle.md](../commands/dev-cycle.md) Phase 4. The QA verdict itself does not soften based on severity.
 
 **BLOCKED and NOT_RUN are honest verdicts, not failures of QA.** Use them — never paper over a missing capability or a skipped walk with a hallucinated PASS.
 
@@ -932,6 +940,7 @@ In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop 
 - Don't ignore flaky tests — flag them explicitly
 - Don't rubber-stamp a pass — if the product doesn't match the PRD spec, it's a fail, even if "close enough"
 - Don't write tests for unimplemented CUJs — only test what's built
+- **Don't mark a CUJ `UNIMPLEMENTED` when anything for it exists** — a partial screen, a stub, or a task that claimed it gets walked and judged; the label is for CUJs with no implementation at all
 - **Don't accept hardcoded data as a valid implementation** — if a UI component shows a statistic like "已读文章: 12" but the number is a hardcoded constant in the source code rather than queried from real data, that is a FABRICATION, not a feature
 - **Don't accept no-op stubs as valid interaction handlers** — if a button's handler only logs to console or does nothing, the feature is NOT implemented
 - **Don't trust `tasks.md` or `loop-state.md` claims** — verify against the actual code and running product, not against what other docs say is done

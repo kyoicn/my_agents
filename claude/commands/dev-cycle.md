@@ -380,7 +380,9 @@ any other."
 
 ### After QA completes:
 
-Read `docs/qa-report.md` and check the overall verdict plus bug severities. The verdict alone doesn't decide the loop — combine it with the severity distribution:
+Read `docs/qa-report.md` and check the overall verdict plus bug severities. The verdict alone doesn't decide the loop — combine it with the severity distribution. `UNIMPLEMENTED` CUJs never affect this phase: they're unfinished work for later iterations, not failures of this one.
+
+First, **incomplete verification** — the verdict line names CUJs QA couldn't fully walk even after re-walking. Unless MEDIUM+ bugs already send the loop back (that retry re-verifies everything), re-spawn `qa` once for just those CUJs; it counts toward the 2-retry budget. Still incomplete → mark status `blocked` with QA's reason and stop. Never send coders to fix a CUJ with no known bug. Then apply:
 
 - **`PASS`** (no bugs): Continue to Phase 5.
 - **`FAIL` with only `LOW` bugs across the entire report**: Continue to Phase 5. The LOW bugs carry forward in `docs/qa-report.md`, where the next iteration's planner picks them up.
@@ -467,7 +469,7 @@ Status: <continue | done | blocked>
 
 ## Last Cycle Summary
 - Tasks executed: <count>
-- CUJs passed QA: <count> of <in-scope count>
+- CUJs passed QA: <count> of <in-scope count> (<u> unimplemented)
 - Tests passing: <count>
 - Tests failing: <count>
 - QA inner loops used: <0-2>

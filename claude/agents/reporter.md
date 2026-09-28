@@ -68,7 +68,7 @@ The authoritative per-CUJ snapshot. Each row records the latest known state acro
 
 **Column values:**
 - `Impl`: `not started` | `in progress` | `merged`
-- `QA`: `PASS` | `FAIL` | `BLOCKED` | `NOT_RUN` | `WAIVED` | `—` (no QA run yet)
+- `QA`: `PASS` | `FAIL` | `BLOCKED` | `NOT_RUN` | `WAIVED` | `UNIMPLEMENTED` | `—` (no QA run yet)
 - `PM`: `Satisfied` | `Caveats` | `Not done` | `—` (no PM review yet)
 
 A CUJ is **fully done** when Impl=`merged`, QA=`PASS`, AND PM=`Satisfied`. Any other combination means there's still work — list the next action under "Known Issues & TODOs" or in pm-review's recommended priorities.

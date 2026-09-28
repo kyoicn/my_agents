@@ -128,7 +128,7 @@ After writing new tests, run the full suite:
 
 **This step is mandatory.** Automated tests passing is not sufficient.
 
-**Artifact path: `<run-id>` is `iter<N>-<HH-MM-SS>`** where N is the iteration counter from `docs/loop-state.md` (default `1` if loop-state doesn't exist) and `HH-MM-SS` is the local time when this QA invocation started (`date "+%H-%M-%S"`). Each QA invocation gets its own bucket so retries within the same iteration don't overwrite earlier walks. Example: `docs/qa-artifacts/iter3-14-23-45/cuj-3/run1/00-initial.png`. Capture `<run-id>` once at the start of Step 7 and reuse it for every screenshot path in this invocation.
+**Artifact path: `<run-id>` is `iter<N>-<HH-MM-SS>`** where N is the iteration counter from `docs/loop-state.md` (default `1` if loop-state doesn't exist) and `HH-MM-SS` is the local time when this QA invocation started (`date "+%H-%M-%S"`). Each QA invocation gets its own bucket so retries within the same iteration don't overwrite earlier walks. Example: `docs/qa-artifacts/iter3-14-23-45/cuj-3/run1/00-initial.png`. Capture `<run-id>` once at the start of Step 7 and reuse it for every screenshot path in this invocation. Ensure `.gitignore` excludes `docs/qa-artifacts/` (append if missing) — walk artifacts are read from disk (by you and by pm's review) and never committed.
 
 <!-- SYNC:web-app-verification -->
 #### For web apps/services:

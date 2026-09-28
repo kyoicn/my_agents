@@ -18,7 +18,7 @@ The flow:
 - **Phase 0** — Discovery: free-form conversational product design + explicit routing decision (no `AskUserQuestion`, no subagents). Probe problem/user, value, journeys, scope, form factor, edge cases. React to answers, mirror back, surface tensions. End by proposing a route (A/B/C/D) and getting user confirmation.
 - **Phase 0.5** — Shape + mocks: per CUJ, propose the shape, agree on it, draw the first mock and iterate visual + shape together, propose additional variants and draw each. The orchestrator (acting as pm) follows the mock-generation rules in `pm.md`. Mocks are real HTML files saved under `docs/ux/<prd-dir>/` and the file path is included in every response for the user to `open`.
 - **Phase 1** — PM subagent executes the route: bootstrap / write / extend / refine PRD files, referencing the mocks that already exist from Phase 0.5. No re-discovery, no mock generation here (already done).
-- **Phase 2** — Status update: append new CUJ rows (A, B, C) or reset affected rows' Impl/QA/PM columns (D).
+- **Phase 2** — Status update: append new CUJ rows (A, B, C) or reset affected rows' Impl/QA/PM columns (D). Then commit the design.
 - **Phase 3** — Hand off to the user with a truthful summary of what was written, extended, or refined.
 
 ## Phase 0: Discovery — conversational product design + routing
@@ -294,6 +294,12 @@ Do not commit."
 ```
 
 After it returns, verify the status table reflects the route's intent.
+
+Then **commit the design** — `/dev-cycle`'s coder worktrees branch from the last commit, so an uncommitted PRD or mock is invisible to them. Paths: pm's `files_created` + `files_modified`, the Phase 0.5 mock files, `docs/status.md`, and `docs/owner-queue.md` if you registered anything. Use the recipe from `dev-cycle.md` Checkpoint A (never `git add -A` — only these paths):
+
+```bash
+git add -- <paths> && git commit --only -m "docs(prd): <route summary, e.g. add prd-003-sharing (route B)>" -- <paths>
+```
 
 ---
 

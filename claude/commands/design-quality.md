@@ -147,6 +147,8 @@ Three possible returns, all honest:
 
 ## Phase 5: Handoff
 
+First **commit the instrument** — `/quality-cycle` scores inside experiment worktrees that branch from the last commit, and the user's labels are the costliest artifact this session produces. Commit at every exit, not just this one: calibrated, calibration failed, BLOCKER, or paused mid-labeling. Paths: `docs/quality/<slug>/` (`runs/` is gitignored), `scripts/eval-runner.sh`, `.gitignore`, `docs/owner-queue.md docs/rulings.md docs/eng-backlog.md` — whichever changed. Use the recipe from `dev-cycle.md` Checkpoint A → `docs(quality): calibrate <slug> — <outcome>`.
+
 ```
 Quality bar calibrated: <slug>
 

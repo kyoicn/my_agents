@@ -229,9 +229,25 @@ If planner reports nothing left to do (all CUJs in scope implemented and tests p
 
 ---
 
+## Checkpoint A: Commit Before Spawning Coders
+
+Coder worktrees branch from the last commit — anything uncommitted in this checkout (a fresh PRD, this cycle's design-doc updates, qa's new tests) is invisible to them. Run this checkpoint before **every** Phase 3 spawn: the first pass and each QA-retry pass.
+
+**Commit discipline** (here and in Checkpoint B): subagents in the shared checkout never commit — tl's Phase 3.6 code fixes are the one exception. The orchestrator commits only at the two checkpoints, one typed commit per group below, passing only the listed paths that have changes (`git status --porcelain -- <paths>` lists them; skip a group when it's empty). Never `git add -A` or a bare `git commit` — the recipe keeps anything else staged in this checkout from riding along:
+
+```bash
+git add -- <paths> && git commit --only -m "<message>" -- <paths>
+```
+
+1. **Pending spec** — `docs/prd/ docs/ux/` → `docs(spec): commit pending spec changes before iter <N>`. Normally empty (`/design-feature` commits its own output); when it isn't — a hand edit, an older session — starting the loop means "build this spec," so commit it and list the files in the exit report.
+2. **Plan** — `docs/design/ docs/eng-backlog.md docs/tasks.md docs/owner-queue.md docs/rulings.md scripts/owner-lint.sh` → `docs(cycle): iter <N> plan`.
+3. **QA's tests** (retry passes only) — the files under qa-report.md's "New Tests Written", plus any QA tooling it installed (`scripts/qa-*.sh`, `.gitignore`) → `test(qa): <summary>`. Fix-coders need qa's failing tests in their worktree to reproduce the bugs.
+
+---
+
 ## Phase 3: Task Execution
 
-Read `docs/tasks.md`. For each parallel group, spawn all tasks simultaneously as background worktree agents:
+Run Checkpoint A, then read `docs/tasks.md`. For each parallel group, spawn all tasks simultaneously as background worktree agents:
 - `subagent_type: "coder"` — every task-execution agent uses the `coder` role definition (see `claude/agents/coder.md`). Coders own implementation + unit tests + local verification + commit; they explicitly do not modify PRDs/design docs/task plans and do not write integration/E2E tests (those belong to qa).
 - `isolation: "worktree"` — each agent gets its own branch
 - `run_in_background: true` — parallel execution
@@ -334,7 +350,7 @@ Read `docs/qa-report.md` and check the overall verdict plus bug severities. The 
 - **`FAIL` with any bug of severity `MEDIUM` or higher** (any kind — `BUG`, `REGRESSION`, `FABRICATION`, `FLAKY`): **Do NOT continue to Phase 5.** Instead:
   1. Log the failures in `docs/loop-state.md`.
   2. Jump back to **Phase 2** (re-plan with QA-fix tasks as the priority).
-  3. Re-execute **Phase 3** (fix the issues).
+  3. Re-execute **Phase 3** (fix the issues) — Checkpoint A runs first, committing qa's new tests so the fix-coders can run them.
   4. Re-execute **Phase 4** (re-verify).
   5. Maximum 2 QA retry loops per iteration. If still failing after 2 retries, mark status as `blocked` with QA details and stop.
 - **`BLOCKED`** (any CUJ Result is BLOCKED): Stop the loop, mark status as `blocked` in `docs/loop-state.md`, and surface the missing capability to the user. Do not retry — retries cannot fix a missing tool.
@@ -441,7 +457,20 @@ queue entries>
 
 ---
 
+## Checkpoint B: Commit the Iteration Record
+
+Runs at **every** stop — `done`, `continue`, and every early `blocked` (Mocks Check pause, a `BLOCKER:` return from any phase, QA `BLOCKED`, retry budget exhausted) — after `docs/loop-state.md` is written and before the exit report. Same discipline and recipe as Checkpoint A:
+
+1. **QA's tests** not yet committed → `test(qa): <summary>` (as in Checkpoint A group 3).
+2. **The record** — every Checkpoint A path, plus `docs/loop-state.md docs/qa-report.md docs/pm-review.md docs/status.md` → `docs(cycle): iter <N> — <status>`.
+
+`docs/loop-state.md` is in this commit on every stop, so its last commit marks the end of the previous cycle — the baseline Setup uses for `CHANGED_PRDS` and bare `/spec-sync` uses for its delta.
+
+---
+
 ## Exit Conditions
+
+Every stop runs Checkpoint B before its report — including early `blocked` stops from any phase.
 
 - **Status = `done`**: Report to the user that all CUJs in scope are implemented and verified by QA. List what was accomplished across all iterations. Stop the loop.
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.

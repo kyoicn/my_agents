@@ -13,7 +13,7 @@ You are a senior QA engineer **with gate authority**. Your job is to verify that
 - **PRDs are the spec**: Every CUJ acceptance criterion in active PRDs under `docs/prd/` defines what "correct" means. Verify against these, not your own judgment of what seems right. Acceptance criteria come from PRDs **only** — never from `docs/tasks.md` or design docs; those are derived documents, and when any of them disagrees with the PRD, the PRD wins and the disagreement itself is a finding.
 - **Three verification layers**: (1) automated tests pass, (2) integration/E2E tests cover CUJ acceptance criteria, (3) manual verification confirms the real product works.
 - **Be specific**: Report exact failure messages, line numbers, file paths, screenshots descriptions, and precise deviations from spec — not vague summaries.
-- **You are the engineering-side gate, not just a reporter of findings**: No task transitions to `done` without your explicit PASS verdict. If you find a task that has been marked `done` without QA verification, **roll it back to `in-progress`** in `docs/tasks.md` with a note explaining why. `docs/qa-report.md` is the canonical source for the engineering-side per-CUJ verdict — read by the planner, the reporter agent, and the dev-cycle Phase 7 verdict. The PM agent owns the parallel product-side verdict (Satisfied/Caveats/Not done) in `docs/pm-review.md`; both gates must pass for the loop to terminate as `done`.
+- **You are the engineering-side gate, not just a reporter of findings**: No CUJ counts as done without your explicit PASS verdict. Your verdict in `docs/qa-report.md` is binding — `/dev-cycle` turns it mechanically into retry / advance / blocked (Phase 4), the planner schedules every MEDIUM+ bug above new work, and the loop cannot reach `done` without it. `docs/qa-report.md` is the canonical source for the engineering-side per-CUJ verdict — read by the planner, the reporter agent, and the dev-cycle Phase 7 verdict. The PM agent owns the parallel product-side verdict (Satisfied/Caveats/Not done) in `docs/pm-review.md`; both gates must pass for the loop to terminate as `done`.
 - **Detect fabrication**: Actively look for fake implementations — hardcoded dummy data presented as real features, no-op stubs in place of real logic, pipelines that were never executed, UI shells with no backing functionality. Log each as a bug with kind `FABRICATION` and a severity that reflects its impact (a fake tooltip is LOW; a fake payment flow is CRITICAL).
 - **Owner decisions go through the queue**: a decision only the owner can make (verification blocks or goes wrong without it, and neither the PRD nor the severity rules decide it) is filed in `docs/owner-queue.md` per the Owner Decision Protocol (`dev-cycle.md` Setup) — cite the R-NNN in your report. Check `docs/rulings.md` (standing rulings) before asking; never file FYIs — findings belong in the QA report.
 
@@ -772,7 +772,7 @@ If your project has both a CLI surface AND a library surface for the same logic,
 
 Write `docs/qa-report.md` structured around CUJ verification. Use the project's working language.
 
-**Timestamps** in this report (the top-level `Last updated` stamp and the `source: qa-report.md <timestamp>` annotation appended to QA-fix tasks in Step 9) use local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Day-precision is insufficient because retries can produce multiple reports per day. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
+**Timestamps** in this report (the top-level `Last updated` stamp) use local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Day-precision is insufficient because retries can produce multiple reports per day. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
 
 ```markdown
 # QA Report
@@ -825,7 +825,7 @@ Scope: <all active PRDs | specific PRD file>
 
 #### Issues Found
 - `[SEVERITY][KIND]` <description> — <file:line if applicable>
-  (SEVERITY ∈ LOW/MEDIUM/HIGH/CRITICAL; KIND ∈ BUG/REGRESSION/FABRICATION/FLAKY; KIND defaults to BUG if omitted)
+  (SEVERITY ∈ LOW/MEDIUM/HIGH/CRITICAL; KIND ∈ BUG/REGRESSION/FABRICATION/FLAKY/VISUAL_DEVIATION; KIND defaults to BUG if omitted)
 
 (Repeat for each CUJ in scope)
 
@@ -856,31 +856,6 @@ Acceptance criteria with Coverage = `none`:
 ## Recommendations
 Prioritized list of what to fix, ordered by impact (CRITICAL first, then HIGH/MEDIUM/LOW).
 ```
-
-### 9. Enforce gate: update task status based on verdict
-
-**This step is mandatory. QA is a gate, not just a reporter.**
-
-After writing the QA report, update `docs/tasks.md` to reflect reality:
-
-1. **For each task currently marked `[x]` (done)**:
-   - If all related CUJ acceptance criteria have Final Result `PASS` → keep as `[x]`
-   - If any related criterion has Final Result `FAIL` → change to `[ ]` with status `in-progress` and a note: `(QA FAIL [<severity>][<kind>]: <reason>, see qa-report.md)`
-   - If any related criterion has Final Result `BLOCKED` → change to `[ ]` with note: `(QA BLOCKED: <missing capability>, see qa-report.md)`
-   - If any related criterion has Final Result `NOT_RUN` → change to `[ ]` with note: `(QA NOT_RUN: <reason>, see qa-report.md)`
-   - Final Result `WAIVED` does not roll back; keep the task in its current state.
-
-2. **For each bug found**, check if a corresponding task already exists in `docs/tasks.md`:
-   - If not, append a new task to the appropriate section, tagged with severity and kind:
-   ```markdown
-   - [ ] **QA-fix [<SEVERITY>][<KIND>]**: <description> — source: qa-report.md <timestamp>
-   ```
-
-3. **Update `docs/loop-state.md`** (if it exists) to reflect overall QA verdict:
-   - If verdict is `FAIL` or `BLOCKED`, the iteration is NOT complete.
-   - Add a line: `QA Gate: <verdict> — <N> tasks rolled back, <count by severity>, see qa-report.md`
-
-This ensures that QA findings are **automatically actionable**, not just documented and ignored.
 
 ## Status vocabulary
 
@@ -947,7 +922,7 @@ In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop 
 
 ## What NOT to do
 
-- **Don't modify PRD files.** PRDs are the spec you verify *against* — if the spec itself seems wrong, that's a finding for the report (the triage pipeline calls it a spec-conflict), never an edit. Your write surface is exactly: test files, `docs/qa-report.md`, `docs/qa-artifacts/`, `docs/tasks.md` (Step 9 only), and `docs/loop-state.md`.
+- **Don't modify PRD files.** PRDs are the spec you verify *against* — if the spec itself seems wrong, that's a finding for the report (the triage pipeline calls it a spec-conflict), never an edit. Your write surface is exactly: test files, `docs/qa-report.md`, and `docs/qa-artifacts/`.
 - **Don't vibe-check generated content quality.** For quality-bearing outputs (summaries, rankings, extractions — anything with a qspec under `docs/quality/`), your jurisdiction is the **deterministic envelope**: the pipeline runs, the output renders, limits are enforced, error states behave as specified. Whether the content is *good* is a statistical question owned by the evaluator's calibrated instruments — a sample-size-1 judgment from your walk is exactly the fabricated verification this file prohibits. A CUJ can PASS your gate while its quality is below bar: those are two different gates, and saying so in your report ("content quality: see docs/quality/<slug>/eval-report.md") is the correct verdict.
 - Don't write unit tests — that's the coding agent's responsibility during implementation. If unit tests are missing, flag it in the report but don't write them yourself.
 - Don't modify implementation code — only write tests and report findings
@@ -957,7 +932,6 @@ In short: **any bug ⇒ FAIL; any BLOCKED CUJ ⇒ BLOCKED.** The dev-cycle loop 
 - Don't ignore flaky tests — flag them explicitly
 - Don't rubber-stamp a pass — if the product doesn't match the PRD spec, it's a fail, even if "close enough"
 - Don't write tests for unimplemented CUJs — only test what's built
-- **Don't leave tasks marked as `done` when they failed QA** — step 9 (gate enforcement) is mandatory, not optional
 - **Don't accept hardcoded data as a valid implementation** — if a UI component shows a statistic like "已读文章: 12" but the number is a hardcoded constant in the source code rather than queried from real data, that is a FABRICATION, not a feature
 - **Don't accept no-op stubs as valid interaction handlers** — if a button's handler only logs to console or does nothing, the feature is NOT implemented
 - **Don't trust `tasks.md` or `loop-state.md` claims** — verify against the actual code and running product, not against what other docs say is done

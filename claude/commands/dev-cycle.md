@@ -323,18 +323,15 @@ Spawn a `qa` subagent:
 Prompt: "You are the quality gate for this iteration. Your verdict
 determines whether work is accepted or rejected.
 
-Execute ALL of your steps including Step 9 (gate enforcement):
+Execute ALL of your steps:
 1. Run the full test suite and capture results
 2. Map coverage to CUJ acceptance criteria from active PRDs under docs/prd/
 3. Write missing integration/E2E tests for implemented features
 4. Run all tests again
 5. Perform MANDATORY manual verification — start the app and walk every CUJ
 6. Execute the fabrication detection checklist on EVERY claimed feature
-7. Write docs/qa-report.md with per-CUJ verdicts
-8. **ENFORCE THE GATE (Step 9)**: Update docs/tasks.md — roll back any
-   task marked [x] that failed verification to [ ] with a QA FAIL note.
-   Add new fix tasks for every bug found. Update docs/loop-state.md with
-   your QA Gate verdict.
+7. Write docs/qa-report.md with per-CUJ verdicts and the overall verdict —
+   that verdict is the gate; this orchestrator acts on it mechanically.
 
 Read docs/prd/index.md and active PRDs under docs/prd/ for the CUJ
 acceptance criteria. If any docs/*-guidelines.md files exist, read them
@@ -353,10 +350,10 @@ any other."
 Read `docs/qa-report.md` and check the overall verdict plus bug severities. The verdict alone doesn't decide the loop — combine it with the severity distribution:
 
 - **`PASS`** (no bugs): Continue to Phase 5.
-- **`FAIL` with only `LOW` bugs across the entire report**: Continue to Phase 5. The LOW bugs are queued as next-iteration tasks (qa Step 9 already appended them).
-- **`FAIL` with any bug of severity `MEDIUM` or higher** (any kind — `BUG`, `REGRESSION`, `FABRICATION`, `FLAKY`): **Do NOT continue to Phase 5.** Instead:
+- **`FAIL` with only `LOW` bugs across the entire report**: Continue to Phase 5. The LOW bugs carry forward in `docs/qa-report.md`, where the next iteration's planner picks them up.
+- **`FAIL` with any bug of severity `MEDIUM` or higher** (any kind — `BUG`, `REGRESSION`, `FABRICATION`, `FLAKY`, `VISUAL_DEVIATION`): **Do NOT continue to Phase 5.** Instead:
   1. Log the failures in `docs/loop-state.md`.
-  2. Jump back to **Phase 2** (re-plan with QA-fix tasks as the priority).
+  2. Jump back to **Phase 2** (re-plan with fixes for qa-report.md's MEDIUM+ bugs as the priority).
   3. Re-execute **Phase 3** (fix the issues) — Checkpoint A runs first, committing qa's new tests so the fix-coders can run them.
   4. Re-execute **Phase 4** (re-verify).
   5. Maximum 2 QA retry loops per iteration. If still failing after 2 retries, mark status as `blocked` with QA details and stop.
@@ -435,8 +432,7 @@ Status: <continue | done | blocked>
 
 ## Last Cycle Summary
 - Tasks executed: <count>
-- Tasks passed QA: <count>
-- Tasks rolled back by QA: <count> (<list task names>)
+- CUJs passed QA: <count> of <in-scope count>
 - Tests passing: <count>
 - Tests failing: <count>
 - QA inner loops used: <0-2>
@@ -446,10 +442,9 @@ Status: <continue | done | blocked>
 - ENG entries open: <count> (<count of blocking>)
 
 ## QA Gate
-- Verdict: <PASS | FAIL>
+- Verdict: <PASS | FAIL | BLOCKED>
 - Fabrications found: <count> (<brief list or "none">)
-- HIGH bugs found: <count>
-- Tasks rolled back: <list of task names set back to in-progress>
+- Bugs by severity: <CRITICAL n / HIGH n / MEDIUM n / LOW n>
 
 ## Blocker (if status = blocked)
 <description of what requires user input — cite the docs/owner-queue.md

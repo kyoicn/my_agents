@@ -268,7 +268,14 @@ After all groups complete:
 4. If a merge conflict occurs:
    - Attempt automatic resolution for trivial conflicts (import additions, non-overlapping changes)
    - For non-trivial conflicts, note the conflict in loop-state.md and attempt resolution by reading both changes and combining them
-5. **PRD guard.** Task branches must never touch `docs/prd/` — coders are read-only there, and the only sanctioned PRD edit in this whole cycle is pm's status flip in Phase 6. Check: `git diff --name-only "$PRE_MERGE" HEAD -- docs/prd/`. If anything is listed, revert it (`git checkout "$PRE_MERGE" -- docs/prd/ && git commit -m "revert: strip PRD edits from task branches (coders are read-only on docs/prd/)"`), identify which branch introduced it, and log the violation + task name in `docs/loop-state.md` — spec drifting to match implementation is exactly what this pipeline exists to prevent.
+5. **PRD guard.** Task branches must never touch `docs/prd/` — coders are read-only there, and the only sanctioned PRD edit in this whole cycle is pm's status flip in Phase 6. List offending files: `git diff --name-only "$PRE_MERGE" HEAD -- docs/prd/`. If anything is listed, strip exactly those files (substitute them for `<files>`):
+
+   ```bash
+   git restore --source="$PRE_MERGE" --staged --worktree -- <files>
+   git commit --only -m "revert: strip PRD edits from task branches (coders are read-only on docs/prd/)" -- <files>
+   ```
+
+   `restore`, not `checkout`: `git checkout <base> -- <dir>` resets files that existed at the base but leaves files a branch *added*, so a planted PRD file would survive. Then identify which branch introduced the edit and log the violation + task name in `docs/loop-state.md` — spec drifting to match implementation is exactly what this pipeline exists to prevent.
 6. After all merges, run the project's compilation/type-check command (e.g., `npx tsc --noEmit`, `cargo check`, `go build ./...`, `python -m py_compile`) to verify the combined code compiles. If it fails, fix compilation errors before proceeding.
 
 ---

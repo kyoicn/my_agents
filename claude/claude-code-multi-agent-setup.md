@@ -92,9 +92,12 @@ This setup creates a team of specialized AI agents that collaborate in an autono
               │                                                  │
        Coder (implements in a worktree, branch exp/<EXP-id>)     │
               │                                                  │
+       Eval-asset guard (strips branch edits to docs/quality,    │
+                  docs/prd, owner files — before any scoring)    │
+              │                                                  │
        Evaluator (scores in the worktree — delta vs baseline     │
                   vs noise floor → ACCEPTED merge / REJECTED     │
-                  discard; eval-asset guard on docs/quality|prd) │
+                  discard)                                       │
               │                                                  │
        Researcher (lab-notebook entry — negative results kept)   │
               │                                                  │

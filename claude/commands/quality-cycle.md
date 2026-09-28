@@ -43,10 +43,24 @@ Spawn a `coder` (`isolation: "worktree"`, background): the researcher's spec ver
 
 Record the experiment as `running` in the notebook (spawn `researcher` briefly, or fold into Q5's entry — never write `experiments.md` yourself; the orchestrator writes only `quality-loop-state.md`).
 
-## Phase Q4: Score + gate
+## Phase Q4: Guard + score + gate
 
-1. Spawn `evaluator`: official **experiment** run against the coder's branch, executed **in the experiment's worktree** — never by fetching branch files into the shared checkout. `git checkout <branch> -- <paths>` silently *stages* those files, and a later typed commit sweeps them onto main even when `git add` named only doc paths: that is the documented probe-leak mechanism, and worktree discipline is its counter. Report with delta vs baseline and the mechanical **gate verdict** (ACCEPTED / REJECTED, naming the deciding qspec rule).
-2. **Eval-asset guard** (the Phase 3.5 PRD-guard analog — mechanical, not advisory): before any merge, `git diff --name-only main...<branch> -- docs/quality/ docs/prd/ docs/owner-queue.md docs/rulings.md` must be empty. Anything listed → strip it (`git checkout main -- <paths>` on the branch, commit the strip), log the violation + experiment id in `quality-loop-state.md`. An experiment that edited the exam is measured only after the exam is restored.
+1. **Eval-asset guard — before scoring** (the Phase 3.5 PRD-guard analog — mechanical, not advisory). An experiment that edited the exam is measured only after the exam is restored, so the guard runs first. List what the branch changed in protected paths:
+
+   ```bash
+   BASE=$(git merge-base main <branch>)
+   git diff --name-only "$BASE" <branch> -- docs/quality/ docs/prd/ docs/owner-queue.md docs/rulings.md
+   ```
+
+   Anything listed → in the experiment's worktree, strip exactly those files (substitute them for `<files>`), then log the violation + experiment id in `quality-loop-state.md`:
+
+   ```bash
+   git restore --source="$BASE" --staged --worktree -- <files>
+   git commit --only -m "revert: strip eval-asset edits from EXP-<id>" -- <files>
+   ```
+
+   `restore`, not `checkout`: `git checkout <base> -- <dir>` resets files that existed at the base but leaves files the branch *added*, so a planted eval case would survive. Restore from the branch point (`$BASE`), not `main`, so only the branch's own edits are undone.
+2. Spawn `evaluator`: official **experiment** run against the coder's branch, executed **in the experiment's worktree** — never by fetching branch files into the shared checkout. `git checkout <branch> -- <paths>` silently *stages* those files, and a later typed commit sweeps them onto main even when `git add` named only doc paths: that is the documented probe-leak mechanism, and worktree discipline is its counter. Report with delta vs baseline and the mechanical **gate verdict** (ACCEPTED / REJECTED, naming the deciding qspec rule).
 3. **ACCEPTED** → merge the branch (`--no-ff`). If the winning change is probe-grade (per its authorization line), do not merge; instead file an ENG entry via the eng-backlog convention — "harden EXP-<id> mechanism for production; Verify: smoke eval reproduces the gain" — and route architecture-level graduations through tl in the next `/dev-cycle`. Probe code never lands on main.
 4. **REJECTED** → discard the branch (worktree removed, branch deleted). The learning survives in the notebook; the code doesn't.
 

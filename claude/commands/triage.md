@@ -1,16 +1,16 @@
 ---
-description: Diagnose reported issues, assess scope, identify root cause, and recommend a resolution path (quick-fix vs. dev-cycle). Reads from docs/issues.md or takes a direct issue description.
+description: Diagnose reported issues and route each to the command that fixes it — run-now routes (quick-fix, spec-sync, design-feature) execute in this session; queued routes (dev-cycle, quality-cycle, design-quality) are taken by that command's next run. Reads from docs/issues.md or takes a direct issue description.
 ---
 
 # Triage
 
-You are diagnosing reported issues to determine their root cause, scope, and the best resolution path. You do NOT fix anything — you analyze and recommend.
+You are the router for reported issues: diagnose each one's root cause and scope, then hand it to the command that fixes it. Every issue leaves triage routed — never parked with a recommendation. You don't write fixes yourself; the receiving command does.
 
 ## Input
 
 Check how you were invoked:
 - **With an issue ID** (e.g., `triage 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md`, including its `Screenshots:` field if present, and diagnose only that issue.
-- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that ad-hoc description. Do NOT write anything back to `docs/issues.md` — there's no block to attach to. Just print the diagnosis.
+- **With a direct description** (e.g., `triage "articles aren't sorted by date"`): Diagnose that ad-hoc description, then route it per Step 5 (which says when an ad-hoc item needs a block in `docs/issues.md`).
 - **Without arguments**: Read `docs/issues.md` and diagnose every block that doesn't already have a `**Triage**:` field.
 
 If `docs/issues.md` doesn't exist and no description was provided, tell the user there's nothing to triage.
@@ -46,15 +46,15 @@ Quickly orient yourself:
 
 Classify as one of seven scopes:
 
-| Scope | Criteria | Resolution path |
+| Scope | Criteria | Route (executed in Step 5) |
 |-------|----------|-----------------|
-| **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` |
-| **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` (with QA follow-up) |
-| **large** | Cross-component, design implications, needs architectural review | `/dev-cycle` |
-| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` (Route C extend or Route D refine — let the orchestrator decide) |
-| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask user (spec wrong → `/design-feature` Route D to refine; report wrong → close as invalid) |
-| **spec-stale** | Implementation deviates from the PRD *deliberately* — git history shows a user-directed change (e.g. a `fix:` commit from a /quick-fix or ad-hoc session) newer than the spec text. The code is right; the doc is stale. | `/spec-sync` (docs-only — amend the contradicted PRD lines/mocks; no code change) |
-| **quality** | The deterministic behavior is correct, but *how good* the output is falls below bar — statistically or on a category ("summaries are bad on listicles"). Not a code defect, not a stale spec: a quality gap on a surface with (or needing) a qspec under `docs/quality/`. | `/quality-cycle <slug>` — and hand the complaint's example(s) to the evaluator as eval-set case candidates. No qspec exists yet → `/design-quality` first. Never "fix" quality by vibe in a quick-fix. |
+| **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` — run now |
+| **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` — run now (the next `/dev-cycle`'s QA walk re-verifies) |
+| **large** | Cross-component, design implications, needs architectural review | `queued → /dev-cycle` — its next run takes it |
+| **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` — run now (Route C extend or Route D refine — let its orchestrator decide) |
+| **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask the user now → spec wrong: `/design-feature` Route D; report wrong: close as invalid |
+| **spec-stale** | Implementation deviates from the PRD *deliberately* — git history shows a user-directed change (e.g. a `fix:` commit from a /quick-fix or ad-hoc session) newer than the spec text. The code is right; the doc is stale. | `/spec-sync` — run now (docs-only — amend the contradicted PRD lines/mocks; no code change) |
+| **quality** | The deterministic behavior is correct, but *how good* the output is falls below bar — statistically or on a category ("summaries are bad on listicles"). Not a code defect, not a stale spec: a quality gap on a surface with (or needing) a qspec under `docs/quality/`. | `queued → /quality-cycle <slug>` — its next run hands the complaint's example(s) to the evaluator as eval-case candidates. No qspec yet → `queued → /design-quality (<surface>)`. Never "fix" quality by vibe in a quick-fix. |
 
 Key questions for scope assessment:
 - How many files need to change?
@@ -87,7 +87,7 @@ For each issue, print a structured diagnosis:
 **Related CUJ**: CUJ-<ID> (<PRD file>) | none (spec-gap)
 **Root cause**: <specific explanation — file:line, what's wrong, why>
 **Files involved**: <list of files that need changes>
-**Recommended action**: /quick-fix | /quick-fix + QA | /dev-cycle | /design-feature | /spec-sync | /quality-cycle | ask user
+**Route**: /quick-fix | /spec-sync | /design-feature | ask user | queued → /dev-cycle | queued → /quality-cycle <slug> | queued → /design-quality (<surface>)
 **Risk**: <what could go wrong with the fix, regression potential>
 ```
 
@@ -106,7 +106,7 @@ For spec-conflict issues, additionally explain:
 - What the report claims the behavior should be
 - The current implementation (does it follow the PRD or not?)
 - Do NOT decide which side is correct — present both and ask the user to resolve
-- **Headless invocation** (orchestrated, no live user): don't leave "ask user" dangling — register the conflict as a `docs/owner-queue.md` entry per the Owner Decision Protocol (`dev-cycle.md` Setup), options = the two readings, no armed default (spec conflicts are the owner's), and cite the R-NNN in the Triage field's Recommended action
+- **Headless invocation** (orchestrated, no live user): don't leave "ask user" dangling — register the conflict as a `docs/owner-queue.md` entry per the Owner Decision Protocol (`dev-cycle.md` Setup), options = the two readings, no armed default (spec conflicts are the owner's), and cite the R-NNN in the Triage field's Route
 
 ### 4. Update docs/issues.md — append a Triage field to the issue block
 
@@ -142,21 +142,31 @@ After:
   - **Scope**: small
   - **Root cause**: `src/services/articles.ts:42` — `sort()` callback returns 0 for all comparisons because timestamps are strings
   - **Files involved**: `src/services/articles.ts`
-  - **Recommended action**: `/quick-fix`
+  - **Route**: `/quick-fix`
   - **Risk**: low — isolated to one comparator, no API change
 ```
 
 Format rules:
 - Triage timestamp uses the same format as the rest of the project: `YYYY-MM-DD HH:MM:SS (UTC±N)`. Get it via the standard `python3 -c "..."` one-liner used elsewhere.
 - Append `Triage` at the bottom of the block, after the existing fields. Do not rewrite the headline; preserve it verbatim.
+- For queued routes, the Triage field is all the receiving loop will see — add a `Notes` sub-field carrying Step 3's extra explanation (for large: design decisions affected, what the dev-cycle should focus on; for quality: which surface and category, which example to use).
 - If a `Triage` field already exists on a block (re-triage), replace the entire `Triage` block with the new one. Don't accumulate.
 - If the issue turns out to be invalid (not a bug, works as designed, can't reproduce), remove the entire h3 block from `docs/issues.md` (including the leading `---` separator and any screenshots referenced in its Screenshots field — delete those files from `docs/issues-attachments/` too). Explain why in the diagnosis output.
 
-The format on disk is structured for human + agent readability. The diagnosis printed to the conversation (Step 3) is for the user reading now; the field-block in the file is for `/quick-fix` (and the user) to consume later.
+The format on disk is structured for human + agent readability. The diagnosis printed to the conversation (Step 3) is for the user reading now; the field-block in the file is the handoff record the receiving command consumes.
+
+### 5. Route — hand each issue to its fixer
+
+After printing all diagnoses and writing the Triage fields, work through the routes in inbox order:
+
+- **Run-now routes** (`/quick-fix`, `/spec-sync`, `/design-feature`, and the spec-conflict question): invoke the command on the issue in this session. `/quick-fix` removes the issue block itself; for the others, remove the block (and the files its Screenshots field lists) once the command completes — its commit is the record. If a handoff doesn't complete (the user stops it, or the command re-routes), the block stays with its Route recorded.
+- **Queued routes** (`queued → /dev-cycle`, `queued → /quality-cycle <slug>`, `queued → /design-quality (<surface>)`): don't start the loop — those are long runs on the user's cadence. The Route field *is* the handoff: that command takes every issue queued for it on its next run, reports what it took, and removes the block once the fix (or eval case) is in. Tell the user where each went ("queued for your next `/dev-cycle`").
+- **Ad-hoc descriptions** (no block): run-now routes run on the description directly. A queued route needs a block for the loop to take — append one to `docs/issues.md` in `/report-bug`'s format (the description plus your Triage field), so nothing routed is lost.
+- **Headless** (no live user): record the routes and run nothing; spec-conflicts register in the owner queue per Step 3.
 
 ## What NOT to do
 
-- Don't fix anything — only diagnose and recommend
+- Don't write fixes yourself — route to the command that fixes (Step 5)
 - Don't modify source code, tests, or implementation files
 - Don't modify PRD files or design docs
 - Don't create tasks in docs/tasks.md

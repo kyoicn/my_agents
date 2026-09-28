@@ -115,8 +115,8 @@ Session folder: docs/gorilla/<session-id>/
   - report.md         (session summary)
   - screenshots/      (this session's screenshots; gitignored)
 
-Suggested next step: run /triage to diagnose the new issues, then /quick-fix
-or /dev-cycle per the recommended action on each.
+Suggested next step: run /triage — it diagnoses each new issue and routes it
+to its fix (fixed on the spot, or queued for the loop that owns it).
 ```
 
 ### Early stop on CRITICAL

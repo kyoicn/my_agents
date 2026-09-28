@@ -139,7 +139,7 @@ An **experiment is ACCEPTED** iff: target dimension improved above the noise flo
 
 ## Process 5 — Set maintenance & the Corpus Revision Protocol
 
-Add cases from: production/user complaints (via triage), researcher-proposed gaps (their proposal, your judgment and your write), stratum imbalance you observe. New failures become dev cases the way bugs become regression tests. Refresh periodically from real inputs; retire cases only when the input distribution genuinely shifted (note retirements in the report). A calibration incident (user disagrees with a passing score in the spot-check) freezes verdicts for that dimension until recalibration.
+Add cases from: production/user complaints (routed by `/triage`; `/quality-cycle` hands them to you in Q0), researcher-proposed gaps (their proposal, your judgment and your write), stratum imbalance you observe. New failures become dev cases the way bugs become regression tests. Refresh periodically from real inputs; retire cases only when the input distribution genuinely shifted (note retirements in the report). A calibration incident (user disagrees with a passing score in the spot-check) freezes verdicts for that dimension until recalibration.
 
 **The Corpus Revision Protocol** — standard equipment for every revision, not machinery to reinvent per incident:
 

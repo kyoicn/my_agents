@@ -6,7 +6,7 @@ description: File a bug report into docs/issues.md with optional screenshots. Ac
 
 You are filing a bug report. The output is one h3-block entry in `docs/issues.md` plus any screenshots saved to `docs/issues-attachments/`.
 
-This skill owns **intake only**. Diagnosis is `/triage`; fixing is `/quick-fix` or `/dev-cycle`. The skill optionally chains into `/triage` at the end.
+This skill owns **intake only**. Diagnosis and routing are `/triage`'s; fixing belongs to whichever command it routes to. The skill optionally chains into `/triage` at the end.
 
 ## Phase 0: Setup
 

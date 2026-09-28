@@ -1,5 +1,5 @@
 ---
-description: Fix a small-scope work item directly — a defect from docs/issues.md, an ad-hoc description, or a small engineering task from docs/eng-backlog.md (quick-fix ENG-NNN). Triages first (if not already triaged), then implements, runs tests, and commits. For large issues, escalates to /dev-cycle; ENG entries with Ordering constraints always go through the planner.
+description: Fix a small-scope work item directly — a defect from docs/issues.md, an ad-hoc description, or a small engineering task from docs/eng-backlog.md (quick-fix ENG-NNN). Triages first (if not already triaged), then implements, runs tests, and commits. Anything that isn't small-scope is routed per /triage's table instead of fixed here; ENG entries with Ordering constraints stay in the backlog for the planner.
 ---
 
 # Quick Fix
@@ -11,12 +11,12 @@ You are fixing a small-scope work item — a clear bug, spec deviation, or defec
 Check how you were invoked:
 - **With an issue ID** (e.g., `quick-fix 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md` and fix it. If the block has a `Triage` field, use it as the diagnosis (verify against current code quickly). If not, run the triage logic from `/triage` inline first.
 - **With an ENG ID** (e.g., `quick-fix ENG-004`): Read that h3 block from `docs/eng-backlog.md`. The entry's Scope/Acceptance criteria/Verify fields are the spec — no triage needed. Two eligibility gates before touching code:
-  - The entry must pass the same small-scope gate as a defect (1-3 files, no design change, no shared interface or data-model change). Larger → STOP, tell the user it goes through the planner (`/dev-cycle` or `/user:planner`).
-  - The entry must have **no `Ordering` field**. Ordering constraints are honored by the planner's group sequencing; ad-hoc execution loses them. Constrained → STOP, same redirect.
+  - The entry must pass the same small-scope gate as a defect (1-3 files, no design change, no shared interface or data-model change). Larger → leave it in the backlog and tell the user the next `/dev-cycle` schedules it (the planner reads the backlog).
+  - The entry must have **no `Ordering` field**. Ordering constraints are honored by the planner's group sequencing; ad-hoc execution loses them. Constrained → same: it stays in the backlog for the planner.
 - **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that ad-hoc description in one shot, without going through `docs/issues.md`.
 - **Without arguments**: Read `docs/issues.md`, pick the first **triaged** small/medium-scope block (one whose `Triage` field shows scope=small or scope=medium), and fix it.
 
-**The scope gate applies regardless of where the diagnosis came from** — an existing `Triage` field, your inline triage, or an ENG entry's fields. If the (existing or freshly derived) scope is large, spec-gap, or spec-conflict, STOP and escalate per Step 1; never proceed because a diagnosis already exists.
+**Only small or medium scope is fixed here**, wherever the diagnosis came from — an existing `Triage` field, your inline triage, or an ENG entry's fields. Any other scope is routed per Step 1, never fixed here because a diagnosis already exists.
 
 ## Process
 
@@ -27,9 +27,9 @@ If the issue block already has a `Triage` field (because `/triage` ran on it), u
 If the issue hasn't been triaged yet:
 - Read the relevant source code and CUJs
 - **If the block has a `Screenshots` field, read each screenshot with the Read tool** for visual context before diagnosing.
-- Identify root cause, files involved, and scope
-- If scope is **large**: STOP. Tell the user: "This issue has design implications — recommend using `/dev-cycle` instead." Explain why. Do not attempt the fix.
-- If scope is **spec-gap** or **spec-conflict**: STOP. Recommend `/design-feature` (Route C or D) and explain.
+- Identify root cause, files involved, and scope — classify with `/triage`'s full scope table (all seven scopes, including spec-stale and quality)
+
+If the scope (existing or freshly derived) is anything but small or medium, **route it instead of fixing it** — you're the one the user asked, so the handoff happens here, not as a refusal: write the Triage field onto the issue block (Route included, per `/triage` Step 4) and follow `/triage` Step 5. Run-now routes (`/spec-sync`, `/design-feature`, the spec-conflict question) continue in this session; queued routes (large → `/dev-cycle`, quality → `/quality-cycle`) are recorded, and you tell the user where the item went.
 
 ### 2. Plan the fix
 
@@ -108,19 +108,19 @@ If the work item was an ENG entry: remove its h3 block from `docs/eng-backlog.md
 ## Scope guard
 
 If at any point during the fix you realize the issue is larger than expected:
-- **You've already touched 3+ files and there's more to do**: Stop. Tell the user the scope expanded and recommend `/dev-cycle`.
+- **You've already touched 3+ files and there's more to do**: Stop.
 - **The fix requires changing a shared interface or data model**: Stop. This needs TL review.
 - **Fixing this bug would break other features**: Stop. This needs the full pipeline.
 
-Do not push through a large fix just because you started. It's better to stop early and escalate than to produce a half-fix.
+In each case the item is now large: revert your partial edits (`git restore -- <files you touched>`), update its Triage field (scope `large`, `Route: queued → /dev-cycle`, with what you learned in `Notes`; an ad-hoc item gets a block per `/triage` Step 5) so the next `/dev-cycle` takes it, and tell the user. Do not push through a large fix just because you started — a half-fix is worse than a clean handoff.
 
 ## What NOT to do
 
-- Don't attempt large fixes — escalate to `/dev-cycle`
+- Don't attempt large fixes — route them (`queued → /dev-cycle`)
 - Don't fast-path an ENG entry that has an `Ordering` field — constrained entries go through the planner, whatever their size
 - Don't complete an ENG entry without executing its `Verify` check and reporting the evidence
 - Don't refactor or "improve" code beyond what the fix requires
-- Don't modify PRD files or design docs — the spec isn't wrong, the code is
+- Don't modify PRD files or design docs beyond Step 6's spec-sync amendments — in the normal case the spec isn't wrong, the code is
 - Don't skip running tests
 - Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
 - Don't skip the spec-sync check (Step 6) when a fix changes user-visible behavior away from the spec — unsynced drift is what makes later cycles revert intentional changes

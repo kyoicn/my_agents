@@ -35,7 +35,7 @@ The shape drives everything downstream — say it out loud and get agreement bef
 
 Conversational, in the main thread, like `/design-feature` discovery — no `AskUserQuestion`, free-form text. **One dimension at a time, like one mock per turn.**
 
-1. **Assemble 3–5 real inputs** spanning the distribution (for a summarizer: a normal article, a long one, a listicle, one with tables). Prefer real project data; ask the user to point at some if none is at hand.
+1. **Assemble 3–5 real inputs** spanning the distribution (for a summarizer: a normal article, a long one, a listicle, one with tables). Prefer real project data; ask the user to point at some if none is at hand. Start with complaints `/triage` routed here — `docs/issues.md` blocks with `Route: queued → /design-quality (<surface>)` for this surface: they are exactly the judgments this session exists to capture. Once their examples are in the calibration set, delete those blocks (and the files their Screenshots fields list).
 
 2. **Produce candidate outputs.** If the pipeline exists, run it; *additionally hand-write 1–2 deliberately different variants per input* (one too terse, one subtly unfaithful, one verbose-but-accurate...). Contrast is what elicits judgments — three similar outputs teach nothing.
 
@@ -147,7 +147,7 @@ Three possible returns, all honest:
 
 ## Phase 5: Handoff
 
-First **commit the instrument** — `/quality-cycle` scores inside experiment worktrees that branch from the last commit, and the user's labels are the costliest artifact this session produces. Commit at every exit, not just this one: calibrated, calibration failed, BLOCKER, or paused mid-labeling. Paths: `docs/quality/<slug>/` (`runs/` is gitignored), `scripts/eval-runner.sh`, `.gitignore`, `docs/owner-queue.md docs/rulings.md docs/eng-backlog.md` — whichever changed. Use the recipe from `dev-cycle.md` Checkpoint A → `docs(quality): calibrate <slug> — <outcome>`.
+First **commit the instrument** — `/quality-cycle` scores inside experiment worktrees that branch from the last commit, and the user's labels are the costliest artifact this session produces. Commit at every exit, not just this one: calibrated, calibration failed, BLOCKER, or paused mid-labeling. Paths: `docs/quality/<slug>/` (`runs/` is gitignored), `scripts/eval-runner.sh`, `.gitignore`, `docs/owner-queue.md docs/rulings.md docs/eng-backlog.md docs/issues.md` — whichever changed. Use the recipe from `dev-cycle.md` Checkpoint A → `docs(quality): calibrate <slug> — <outcome>`.
 
 ```
 Quality bar calibrated: <slug>

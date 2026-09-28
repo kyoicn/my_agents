@@ -26,6 +26,8 @@ Next, read `docs/loop-state.md` if it exists to understand the current iteration
 
 Read `docs/prd/index.md`, all files under `docs/design/`, and `docs/eng-backlog.md` (if it exists — open engineering tasks; `blocking` entries factor into planning and the final verdict) to orient yourself.
 
+**Routed issues.** Read `docs/issues.md` (if it exists) for the issues `/triage` routed to this loop — blocks whose Triage `Route` is `queued → /dev-cycle`. These are confirmed defects that need the full pipeline. Only you read the inbox: tl and the planner get each routed issue's ID, headline, CUJ, root cause, files, and Notes embedded in their prompts below. Scoped mode takes only issues whose CUJ field names the target PRD; eng-wave mode takes none.
+
 **Determine which PRDs changed since the last cycle** (they drive Phase 1's design-doc reconciliation): `PRD_BASE=$(git log -n1 --format=%H -- docs/loop-state.md 2>/dev/null)`; if set, `CHANGED_PRDS=$(git diff --name-only "$PRD_BASE" HEAD -- docs/prd/)` plus any uncommitted changes (`git diff --name-only HEAD -- docs/prd/`). If no marker exists (first cycle) or the computation fails, treat **all active PRDs** as changed — over-reconciling is safe, missing a change is not.
 
 ### Guidelines Discovery
@@ -187,7 +189,13 @@ design-<slug>.md for component-specific). If you identify needed
 engineering work with no product surface (infrastructure, tooling,
 operational hardening, tech debt), file it as an ENG entry in
 docs/eng-backlog.md per Section 6 of your role definition — every
-entry needs a concrete, executable Verify check. Return a summary of:
+entry needs a concrete, executable Verify check.
+
+Also review the design implications of these defects triage routed
+to this loop (each needs the full pipeline): [embed each routed
+issue's ID, headline, CUJ, root cause, files, and Notes — or 'none'].
+
+Return a summary of:
 1. What design decisions were made or updated
 2. What ENG entries you filed (IDs), if any
 3. What constraints the planner should know about
@@ -210,8 +218,9 @@ docs/prd/, all files under docs/design/, docs/status.md, docs/qa-report.md
 priority above new feature work), and docs/eng-backlog.md (if it exists —
 open engineering tasks). Prioritize in this order:
 1. Fix MEDIUM-or-higher bugs from docs/qa-report.md (any kind — BUG,
-   REGRESSION, FABRICATION, FLAKY, VISUAL_DEVIATION). Severity drives
-   priority, not kind: a [LOW][FABRICATION] is lower than a [HIGH][BUG].
+   REGRESSION, FABRICATION, FLAKY, VISUAL_DEVIATION), and the routed
+   defects listed below. Severity drives priority, not kind: a
+   [LOW][FABRICATION] is lower than a [HIGH][BUG].
 2. `blocking` ENG entries from docs/eng-backlog.md.
 3. The highest-value unfinished CUJs and P1 ENG entries, interleaved —
    sequenced by pm-review priorities, dependencies, and ENG Ordering
@@ -220,7 +229,13 @@ open engineering tasks). Prioritize in this order:
 Never schedule new feature work while any MEDIUM-or-higher bug remains
 unresolved. Tasks derived from ENG entries must reference the ENG ID in
 the title, copy the entry's Verify check into 'Done when', and honor
-Ordering constraints when grouping.
+Ordering constraints when grouping. Tasks fixing a routed defect must
+carry its Issue ID in the title.
+
+Routed defects (confirmed by triage; they need the full pipeline):
+[embed each routed issue's ID, headline, CUJ, root cause, files, and
+Notes — or 'none'].
+
 Return a summary of what tasks were scheduled and how many parallel groups
 there are."
 ```
@@ -416,10 +431,12 @@ for the next iteration."
 
 If a prior phase already set status to `blocked` (Mocks Check pause, QA `BLOCKED`, or Phase 4 retry budget exhausted), use that status and skip the computation. Otherwise compute the verdict deterministically from **both** the QA report and PM's review — no agent call needed:
 
-- **`done`** if QA verdict is `PASS` (or `FAIL` with LOW-only bugs) AND **every in-scope CUJ has PM verdict `Satisfied`** in `docs/pm-review.md` AND **no `blocking` ENG entry remains open** in `docs/eng-backlog.md` (in scoped mode, count only blocking entries whose `Relates-to` names the target PRD). All gates must pass. Open `P1`/`P2` ENG entries do NOT block `done` — they persist in the backlog for future cycles; that's what the backlog is for.
-- **`continue`** otherwise — QA found MEDIUM+ bugs (and the Phase 4 inner loop didn't already exit), or PM judged at least one CUJ `Caveats` or `Not done`, or a `blocking` ENG entry is still open. The PM review's "Recommended Next-Iteration Priorities" list seeds the next planner.
+- **`done`** if QA verdict is `PASS` (or `FAIL` with LOW-only bugs) AND **every in-scope CUJ has PM verdict `Satisfied`** in `docs/pm-review.md` AND **no `blocking` ENG entry remains open** in `docs/eng-backlog.md` (in scoped mode, count only blocking entries whose `Relates-to` names the target PRD) AND **no routed issue remains open** (after this phase's closing step below). All gates must pass. Open `P1`/`P2` ENG entries do NOT block `done` — they persist in the backlog for future cycles; that's what the backlog is for.
+- **`continue`** otherwise — QA found MEDIUM+ bugs (and the Phase 4 inner loop didn't already exit), or PM judged at least one CUJ `Caveats` or `Not done`, or a `blocking` ENG entry or a routed issue is still open. The PM review's "Recommended Next-Iteration Priorities" list seeds the next planner.
 
 This two-key gate ensures engineering correctness (QA) and product intent (PM) both sign off before the loop terminates. QA can pass a CUJ that meets every literal acceptance criterion while PM correctly judges it `Caveats` because the impl misses the point of the feature — that's a `continue` signal, not a `done`.
+
+**Close routed issues** whose fix is confirmed — its task merged and `docs/qa-report.md` shows the issue's CUJ `PASS` (CUJ `unknown` → merged and QA reports no related bug). Delete each closed block from `docs/issues.md`, along with the files its Screenshots field lists. Unconfirmed ones stay open for the next cycle.
 
 Then write `docs/loop-state.md`. The `Last updated` stamp uses local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`) — day-precision is insufficient because the loop can rewrite this file multiple times per day during inner retries. Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
 
@@ -440,6 +457,7 @@ Status: <continue | done | blocked>
 - CUJs remaining: <count>
 - ENG entries completed this cycle: <list of ENG-NNN, or "none">
 - ENG entries open: <count> (<count of blocking>)
+- Routed issues: taken <IDs, or "none"> / closed <IDs> / still open <count>
 
 ## QA Gate
 - Verdict: <PASS | FAIL | BLOCKED>
@@ -464,7 +482,7 @@ queue entries>
 Runs at **every** stop — `done`, `continue`, and every early `blocked` (Mocks Check pause, a `BLOCKER:` return from any phase, QA `BLOCKED`, retry budget exhausted) — after `docs/loop-state.md` is written and before the exit report. Same discipline and recipe as Checkpoint A:
 
 1. **QA's tests** not yet committed → `test(qa): <summary>` (as in Checkpoint A group 3).
-2. **The record** — every Checkpoint A path, plus `docs/loop-state.md docs/qa-report.md docs/pm-review.md docs/status.md` → `docs(cycle): iter <N> — <status>`.
+2. **The record** — every Checkpoint A path, plus `docs/loop-state.md docs/qa-report.md docs/pm-review.md docs/status.md docs/issues.md` → `docs(cycle): iter <N> — <status>`.
 
 `docs/loop-state.md` is in this commit on every stop, so its last commit marks the end of the previous cycle — the baseline Setup uses for `CHANGED_PRDS` and bare `/spec-sync` uses for its delta.
 
@@ -476,6 +494,6 @@ Every stop runs Checkpoint B before its report — including early `blocked` sto
 
 - **Status = `done`**: Report to the user that all CUJs in scope are implemented and verified by QA. List what was accomplished across all iterations. Stop the loop.
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.
-- **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, what remains). The loop continues to the next iteration.
+- **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, routed issues taken / closed, what remains). The loop continues to the next iteration.
 
 Every exit report — all three statuses, and the eng-wave net line — ends with the owner-queue line from the Setup sweep: `Owner queue: +<n> filed / <m> closed (<k> defaulted) / <j> open (oldest R-NNN, <i> iters)`.

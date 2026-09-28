@@ -48,13 +48,16 @@ This setup creates a team of specialized AI agents that collaborate in an autono
 /report-bug ──► docs/issues.md (h3 block) + docs/issues-attachments/*.png (gitignored)
        │
        ▼
-   /triage  ──► appends Triage field to the issue block ──► /quick-fix  (small/medium) ──► commit
-                                                      ├──► /dev-cycle  (large)
-                                                      ├──► /design-feature  (spec-gap — feature needs design)
-                                                      ├──► ask user        (spec-conflict — report vs PRD; headless → R-NNN in docs/owner-queue.md)
-                                                      ├──► /spec-sync      (spec-stale — code is right, doc is stale)
-                                                      ├──► /quality-cycle  (quality — output below bar, not broken; example joins the eval set)
-                                                      └──► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
+   /triage  ──► diagnoses each issue, writes its Triage field (incl. Route), hands it off:
+       │
+       ├─ run now ──► /quick-fix       (small/medium) ──► commit
+       │          ├─► /spec-sync       (spec-stale — code is right, doc is stale)
+       │          ├─► /design-feature  (spec-gap — feature needs design)
+       │          └─► ask user         (spec-conflict — report vs PRD; headless → R-NNN in docs/owner-queue.md)
+       ├─ queued ───► /dev-cycle       (large — its next run takes it; closed once QA confirms the fix)
+       │          ├─► /quality-cycle   (quality — its next run hands the example to the evaluator)
+       │          └─► /design-quality  (quality, no bar yet — the session calibrates on the example)
+       └─ moved ────► docs/eng-backlog.md  (misfiled eng task, or debt found during diagnosis)
 ```
 
 **Engineering tasks (backlog pipeline):**
@@ -180,8 +183,8 @@ Each row links to the canonical command definition.
 | [`/design-feature`](commands/design-feature.md) | Design a product feature conversationally. Routes to one of four outcomes (Route A bootstrap brand-new project / Route B new PRD in existing project / Route C extend existing PRD with new CUJs / Route D refine existing CUJs in place). **CUJ shapes AND HTML mocks are produced together** during the design conversation; mocks save under `docs/ux/<prd-dir>/`; file paths included in every response so the user can `open` them. |
 | [`/dev-cycle`](commands/dev-cycle.md) | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Checkpoint A (commit) → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict → Checkpoint B (commit). Use with `/loop /dev-cycle` for continuous operation. |
 | [`/report-bug`](commands/report-bug.md) | Conversational bug intake with screenshot support (clipboard via `pngpaste` → file path → interactive `screencapture` → skip). Writes an h3 block to `docs/issues.md`; screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
-| [`/triage`](commands/triage.md) | Diagnose issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or freeform description). Appends a structured `Triage` field — scope, root cause, files, recommended action, risk. |
-| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — refused if the entry has an Ordering constraint). Escalates if scope expands mid-fix. Runs the spec-sync check after every fix (Step 6). |
+| [`/triage`](commands/triage.md) | Diagnose and route issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or freeform description). Appends a structured `Triage` field — scope, root cause, files, route, risk — then hands each issue off: run-now routes (`/quick-fix`, `/spec-sync`, `/design-feature`, the spec-conflict question) execute in the session; queued routes (`/dev-cycle`, `/quality-cycle`, `/design-quality`) are taken by that command's next run. |
+| [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — left for the planner if the entry has an Ordering constraint). Anything not small/medium — at intake or mid-fix — is routed per `/triage`'s table, never refused. Runs the spec-sync check after every fix (Step 6). |
 | [`/spec-sync`](commands/spec-sync.md) | Reconcile PRDs/mocks with intentional out-of-band changes — minimal, user-confirmed, docs-only amendments to the exact contradicted lines. Scoped by construction (description / CUJ / commit range / recent delta); `--all` is an inventory-first sweep of statically-checkable assertions with per-CUJ commits. The sole exception to pm's PRD ownership. |
 | [`/eng-task`](commands/eng-task.md) | Conversational intake for engineering tasks (infrastructure, tooling, operational hardening, tech debt) — the third track alongside defects and features. Writes an h3 block to `docs/eng-backlog.md` with a **mandatory mechanically executable `Verify` check** (no Verify → no entry), Priority (`blocking`/`P1`/`P2`), and optional Ordering constraints. Owns the canonical classification rule for the three tracks. Offers the `/quick-fix ENG-NNN` fast path for small, unconstrained entries. |
 | [`/gorilla-test`](commands/gorilla-test.md) | Manual-only adversarial exploratory test session against the running product. `--time <30m\|1h\|...>` (default 30m, max 4h), optional `--path </articles>`. Files every finding to `docs/issues.md`; per-session output in `docs/gorilla/<session-id>/`. |
@@ -228,12 +231,14 @@ During the session, the agent saves each mock to disk and includes the absolute 
 /report-bug "<description>"         # conversational intake — handles screenshots,
                                     # writes h3 block to docs/issues.md, optionally
                                     # chains into /triage
-/triage <issue-id|description>      # diagnose: scope, root cause, recommended action
+/triage <issue-id|description>      # diagnose, then route: small fixes run now
+                                    # via /quick-fix; large/quality are queued
+                                    # for the loop that owns them
 /quick-fix <issue-id|description>   # fast-path fix for small/medium-scope, then
                                     # removes the block + its screenshots
 ```
 
-The three-stage pipeline (`report → triage → fix-or-escalate`) is well-factored: each step is independently invocable, and `/report-bug` chains into `/triage` on user opt-in for the common all-in-one flow.
+The three-stage pipeline (`report → triage → routed fix`) is well-factored: each step is independently invocable, and `/report-bug` chains into `/triage` on user opt-in for the common all-in-one flow.
 
 **Engineering tasks:**
 ```
@@ -298,8 +303,8 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 4. **Working language detection**: All agents detect the project's working language from existing `docs/` files and write in that language. Technical terms are preserved as-is.
 5. **PRDs organized by feature, design docs organized by engineering domain**: PM writes CUJ-driven PRDs per product feature. TL writes design docs per engineering component/subsystem. Multiple PRDs may feed into one design doc; one PRD may require updates to multiple design docs. This decoupling prevents artificial 1:1 constraints.
 6. **Design docs as one coherent body**: All files in `docs/design/` form a single comprehensive engineering design document — individual files are chapters. `system.md` covers cross-cutting concerns; `design-<slug>.md` files cover component-specific design. The TL always reads ALL design docs before making changes to maintain consistency.
-7. **Separate pipelines for features vs. bugs**: Feature work flows through the full PM → TL → Planner → Execute → QA pipeline via `/design-feature` + `/dev-cycle`. Bug fixes use a lightweight `/report-bug` → `/triage` → `/quick-fix` path that bypasses PRDs and design docs (the spec isn't wrong, the code is). Large bugs that reveal design flaws are escalated to `/dev-cycle`; bugs that reveal *spec* flaws are escalated to `/design-feature` (Route C or D).
-8. **Issues inbox, not issue tracker**: `docs/issues.md` is a write-only intake queue — anyone can jot down a problem. Triage diagnoses entries and routes them. Resolved entries are removed. History lives in git log, not in the inbox.
+7. **Separate pipelines for features vs. bugs**: Feature work flows through the full PM → TL → Planner → Execute → QA pipeline via `/design-feature` + `/dev-cycle`. Bug fixes use a lightweight `/report-bug` → `/triage` → `/quick-fix` path that bypasses PRDs and design docs (the spec isn't wrong, the code is). Triage routes the rest: large bugs that reveal design flaws are queued for `/dev-cycle`; bugs that reveal *spec* flaws go to `/design-feature` (Route C or D).
+8. **Issues inbox, not issue tracker**: `docs/issues.md` is a write-only intake queue — anyone can jot down a problem. Triage diagnoses entries and routes them — run-now routes execute in the triage session; queued routes are taken by the owning loop's next run, which reports what it took and removes the entry once the fix is confirmed. Nothing sits unrouted, and no loop reads the inbox except for entries explicitly routed to it. Resolved entries are removed. History lives in git log, not in the inbox.
 9. **QA as a gate, not a reporter**: `qa`'s verdict in `docs/qa-report.md` is binding, and its roll-up is mechanical (any bug ⇒ FAIL, any BLOCKED CUJ ⇒ BLOCKED — see the QA agent's "Overall verdict"). `/dev-cycle` turns it into retry / advance / blocked by bug severity (Phase 4), the planner schedules every MEDIUM+ bug above new work, and the loop cannot reach `done` without it. QA gates CUJs, not planner tasks — tasks are per-iteration scaffolding (see #3).
 10. **Orthogonal QA dimensions**: Every QA finding has a Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED), Coverage (automated/manual/both/none), and Bug attributes (Severity × Kind). Severity drives the loop's retry decisions; Kind is descriptive.
 11. **Two-run flakiness detection**: QA walks every CUJ twice with a fresh browser session. Inconsistent results between the runs are logged as `[FLAKY]` and treated pessimistically as FAIL — catching the failures that hide on a single pass.
@@ -588,7 +593,7 @@ Then verify with:
 - `/design-feature "test pitch"` — should detect context (brand-new vs existing project), drive conversational discovery in the main thread, and route to bootstrap / new PRD / extend / refine
 - `/dev-cycle` — should run one full autonomous iteration
 - `/report-bug "test bug"` — should drive conversational intake, attempt screenshot capture (prompts you through the options), write an h3 block to `docs/issues.md`, and ensure `docs/issues-attachments/` is in `.gitignore`
-- `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks and append a `Triage` field to each
+- `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks, append a `Triage` field (with Route) to each, then hand each off — running `/quick-fix` / `/spec-sync` / `/design-feature` now, or reporting it as queued for `/dev-cycle` / `/quality-cycle`
 - `/quick-fix <issue-id>` — should fix the issue and remove the block + its referenced screenshots
 - `/spec-sync` — should scope the reconciliation (description / CUJ / commit range / recent delta), find the exact contradicted PRD lines and mock tokens, and propose minimal user-confirmed amendments
 - `/eng-task "test task"` — should apply the classification rule (redirecting defects/features), drive conversational intake, refuse to file without a mechanically executable `Verify`, write an h3 block to `docs/eng-backlog.md` (creating it with the `Next-ID:` preamble on first use), and offer `/quick-fix ENG-NNN` for small entries without Ordering constraints

@@ -49,7 +49,7 @@ Run the loop continuously with `/loop /dev-cycle` — it iterates until `done` o
 | Work | Command | What happens |
 |---|---|---|
 | **Feature** | `/design-feature` | design conversation → PRD + mocks → build loop |
-| **Defect** | `/report-bug` | inbox entry → `/triage` → `/quick-fix` or escalate |
+| **Defect** | `/report-bug` | inbox entry → `/triage` routes it: fixed now, or queued for the loop that owns it |
 | **Eng task** (infra, tooling, tech debt) | `/eng-task` | backlog entry with an executable done-check → scheduled by the planner |
 
 ---
@@ -91,7 +91,7 @@ Adopting an existing codebase? Run `/organize-project` once to retrofit it into 
 /loop /dev-cycle                build autonomously until done or blocked
 
 /report-bug "<what broke>"      file a defect (screenshots supported)
-/triage                         diagnose open defects, recommend a path
+/triage                         diagnose open defects, route each to its fix
 /quick-fix <id>                 fix small-scope items directly
 /eng-task "<task>"              file infra/tooling/tech-debt work
 

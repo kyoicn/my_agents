@@ -28,6 +28,7 @@ qspec.md                  # the bar — pm's, read-only to you
 calibration/labels.md     # user's labeled examples — read-only to you
 evalset/dev/              # cases you own: one file per case (input ref, stratum, id)
 evalset/holdout/          # your custody; never referenced in any report detail
+evalset/smoke.txt         # ~10 fixed dev case IDs for smoke runs (chosen once; never holdout)
 judge/<dimension>.md      # judge prompt per dimension + programmatic checks spec
 judge/calibration-record.md  # agreement results per calibration run
 judge/linters/            # one corpus linter per lintable qspec rule (permanent assets)
@@ -53,15 +54,17 @@ SLUG="$1"; MODE="$2"   # modes: gen | judge | score
 RUN_ID="${3:-$(date +%Y%m%d-%H%M%S)}"
 BASE="docs/quality/$SLUG"; RUN="$BASE/runs/$RUN_ID"
 GEN_CMD="<PROJECT_GEN_CMD>"   # e.g. "python -m pipeline.summarize --input {input} --out {out}"
+SET="${4:-evalset/dev}"       # a set dir under $BASE, or "smoke" = the case IDs in evalset/smoke.txt
 case "$MODE" in
-  gen)    # generate outputs for every case in a set dir: $4 = evalset/dev or a case list file
-    mkdir -p "$RUN/outputs"; while read -r case; do
-      $GEN_CMD ... ; done < <(ls "$BASE/$4"); echo "$RUN" ;;
+  gen)    # generate outputs for every case in the set
+    if [ "$SET" = smoke ]; then CASES=$(cat "$BASE/evalset/smoke.txt"); else CASES=$(ls "$BASE/$SET"); fi
+    mkdir -p "$RUN/outputs"; for case in $CASES; do
+      $GEN_CMD ... ; done; echo "$RUN" ;;
   judge)  # apply judge prompts to generated outputs -> per-item scores in $RUN/scores/
     mkdir -p "$RUN/scores"; echo "$RUN" ;;
   score)  # aggregate $RUN/scores -> stdout summary (means, p10, hard-fail count, per-stratum)
     ;;
-  *) echo "usage: eval-runner.sh <slug> gen|judge|score [run-id] [set]"; exit 1 ;;
+  *) echo "usage: eval-runner.sh <slug> gen|judge|score [run-id] [set-dir|smoke]"; exit 1 ;;
 esac
 ```
 
@@ -80,7 +83,7 @@ The `gen` skeleton above is a template — flesh it out per project (batching, i
    - ≥ threshold on every dimension → calibrated; proceed.
    - Below on any dimension → **stop**. Return the failure with the top disagreement examples ("judge scores these 3 borderline items as 4; user labeled 2 — the anchor for 3 doesn't decide them"). Do not lower the threshold, do not average away a failing dimension, do not proceed "provisionally."
 4. **Write the corpus linters**: one linter per lintable qspec rule (span containment, required fields, format, weights...), under `judge/linters/`, invocable via the runner. These are permanent instrument assets — they run in Phase 3.5 audits, on every corpus revision, and whenever a new rule lands. Linter findings aggregate to **class-level proposed rulings** filed in `docs/owner-queue.md` (one entry per class) — never item-by-item owner asks.
-5. **Seed the eval set**: assemble cases across the qspec's strata (real inputs preferred; the calibration items may seed dev but **never holdout**). Split dev/holdout (~70/30), stratified. Record each case's stratum, and stamp the set with a **corpus version** (`v1`; every subsequent revision increments — see the Corpus Revision Protocol).
+5. **Seed the eval set**: assemble cases across the qspec's strata (real inputs preferred; the calibration items may seed dev but **never holdout**). Split dev/holdout (~70/30), stratified. Record each case's stratum, and stamp the set with a **corpus version** (`v1`; every subsequent revision increments — see the Corpus Revision Protocol). Then pick the **smoke subset** — ~10 dev cases spanning the strata — and write their IDs to `evalset/smoke.txt`. It stays fixed so smoke runs are comparable over time; change it only as part of a corpus revision.
 6. **Establish the noise floor**: run the unchanged pipeline twice on the dev set; the per-dimension delta between runs is the floor, recorded in `eval-report.md`'s header. (Deterministic pipelines — e.g. replay-fixture channels: floor is ±0 — say so.)
 7. **Write the experiment-scoring protocol** (`judge/experiment-scoring.md`) — required before any `/quality-cycle` starts; the field-documented cost of improvising it is integrity infrastructure invented under fire. It must state:
    - **What invalidates fixtures**: which changes (prompt, KB, model, retrieval) force experiments off replay onto live calls.
@@ -93,7 +96,7 @@ Run types, each one ledger entry except smoke:
 - **baseline** — current main, dev set. The reference all experiment deltas compare against.
 - **experiment** — a branch, dev set. Produces the delta + gate verdict.
 - **gate/holdout** — main, holdout. Only when thresholds appear met on dev, or at the cadence the qspec sets. This is the only process that touches holdout.
-- **smoke** — fixed ~10-case dev subset (choose once, keep stable). For dev-cycle regression checks and coder local verification. Not a ledger entry; never grounds for acceptance.
+- **smoke** — the fixed ~10-case dev subset in `evalset/smoke.txt` (missing → choose it now, per Instrument Build step 5). You run and score it for dev-cycle regression checks; coders run only its `gen` step, as local proof the pipeline still runs. Not a ledger entry; never grounds for acceptance.
 
 Steps: check ledger budget → `gen` → `judge` → `score` → write the report. **Artifacts-first ordering is mandatory**: each step's outputs land on disk before the next begins; report prose is written last, from disk. If the budget is exhausted, decline and say so — the orchestrator decides what's worth remaining runs.
 

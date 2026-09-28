@@ -363,7 +363,7 @@ This inner loop ensures non-trivial bugs (MEDIUM+) are fixed within the same ite
 
 ### Quality-surface smoke check (runs alongside the QA gate)
 
-If `docs/quality/` exists: check whether any task merged this iteration touched files named in a `docs/quality/*/qspec.md` Surface section. For each affected slug, spawn an `evaluator` subagent for a **smoke** run (the fixed subset — cheap, not a ledger entry). A regression beyond the noise floor on any dimension counts as a `[MEDIUM][REGRESSION]` bug in this phase's loop rules — the fix task is "restore quality on <slug> (see smoke diff)" or an explicit revert of the offending change. Smoke results are advisory breadth, not depth: improving quality is `/quality-cycle`'s job; this check only stops dev work from silently degrading it.
+If `docs/quality/` exists: check whether any task merged this iteration touched files named in a `docs/quality/*/qspec.md` Surface section. For each affected slug, spawn an `evaluator` subagent for a **smoke** run (the fixed subset in `evalset/smoke.txt` — cheap, not a ledger entry). The evaluator is the only one who scores it; coders only proved the pipeline still runs. A regression beyond the noise floor on any dimension counts as a `[MEDIUM][REGRESSION]` bug in this phase's loop rules — the fix task is "restore quality on <slug> (see smoke diff)" or an explicit revert of the offending change. Smoke results are advisory breadth, not depth: improving quality is `/quality-cycle`'s job; this check only stops dev work from silently degrading it.
 
 ---
 

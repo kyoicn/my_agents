@@ -28,7 +28,20 @@
       "mcp__playwright__*"
     ]
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1[1m]",
+  "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
+    },
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
   "tui": "fullscreen",
-  "theme": "dark-daltonized"
+  "theme": "dark-daltonized",
+  "agentPushNotifEnabled": true
 }

@@ -425,8 +425,8 @@ Agents are assigned **capability tiers** rather than vendor-specific model names
 
 | Agent | Tier | Rationale |
 |-------|------|-----------|
-| `pm` | strong | Design + PRD writing; promote to `max` if design quality degrades |
-| `tl` | strong | Architecture decisions and code review; promote to `max` for complex systems |
+| `pm` | max | Design + PRD writing need the highest reasoning ceiling |
+| `tl` | max | Architecture decisions and code review need the highest reasoning ceiling |
 | `planner` | strong | Task decomposition quality drives the whole pipeline |
 | `coder` | strong | Implementation quality — the main cost center; demote to `fast` for simple projects |
 | `qa` | strong | Gate authority — must catch subtle bugs and fabrications |

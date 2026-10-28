@@ -187,6 +187,7 @@ docs/design/
 7. **List relevant PRDs** in each design doc (as references showing which product features this component serves), but never organize around PRDs.
 8. **Never remove existing decisions** without explicit user approval.
 9. **PRDs outrank design docs — reconcile with the PRD as the diff baseline.** Design docs are derived, implementation-serving artifacts; when one disagrees with a current PRD about user-visible behavior, the design doc is simply wrong and gets rewritten. When updating a design doc after a PRD has changed, cross-examine its assertions against the PRD's current CUJs and acceptance criteria line by line — do not smooth over or re-justify existing content. **Never author a rationale for a design-doc position that contradicts a current PRD**: contradictions are corrected to match the PRD, or escalated (interactive: flag to the user; autonomous: `BLOCKER`) if you believe the PRD itself is wrong. A design-doc claim about user-visible behavior should cite the CUJ/criterion it derives from; a behavioral assertion you cannot trace to the current PRD is rot — rewrite or delete it.
+10. **Design docs are spec, never progress trackers.** No iteration logs, "implemented / not yet" notes, QA-loop annotations, or change summaries — in headers or anywhere else. Progress lives in `docs/loop-state.md`, `docs/status.md`, and git history; what changed in a doc is its diff. A header carries exactly `Last updated`, `Serves`, and (chapters) `Part of`. When implementation and design diverge and the implementation wins, rewrite the section as if it had always said so and record the reason in `system.md` §9 — never as a status note beside the old text.
 
 #### Constraint review — question a constraint before designing to it
 
@@ -232,9 +233,9 @@ The owner supervises the build at architectural seams, not only at the end. You 
 
 | # | Checkpoint | Kind | Scope | Poke | Verify |
 |---|---|---|---|---|---|
-| C1 | Contracts defined | seam | design-api.md §Interface contract, system.md §Data model | read those sections | approved at plan review |
+| C1 | Contracts defined | seam | system.md §5; §4.2 of design-auth.md, design-documents.md | read those sections | approved at plan review |
 | C2 | Data layer up | seam | migrations, repositories | `npm run seed`, then `make db-shell` | `npm run test:db` passes on a clean database |
-| C3 | API batch 1: auth, documents | seam | 6 endpoints | `./scripts/qa-server.sh start`; curl examples in design-api.md §Try it | `npm run test:api` passes; `GET /api/docs` lists the 6 endpoints |
+| C3 | API batch 1: auth, documents | seam | 6 endpoints | `./scripts/qa-server.sh start`; Try it block in design-documents.md §4.2 | `npm run test:api` passes; `GET /api/docs` lists the 6 endpoints |
 | C4 | First journey: create and list a document | journey | CUJ-1, CUJ-2 | walk against docs/ux/prd-000-mockups/ | QA PASS + PM Satisfied for CUJ-1, CUJ-2 |
 | C5 | Sharing journeys | journey | CUJ-3, CUJ-4 | walk | QA PASS + PM Satisfied for CUJ-3, CUJ-4 → done |
 
@@ -249,107 +250,147 @@ The owner supervises the build at architectural seams, not only at the end. You 
 
 #### Quality bar for design docs
 
-Every design doc must be **implementation-ready** — detailed enough that an engineer can build from it without ambiguity. Think of what a real staff engineer would produce for a design review at a top tech company.
+Every design doc has **two readers**, and must work for both:
 
-**Mandatory elements in `system.md`:**
-- System overview & guiding philosophy
-- Tech stack with rationale for each choice
-- High-level system architecture diagram (Mermaid)
-- Shared data model (entity definitions with fields and relationships)
-- API conventions & patterns
-- Cross-cutting concerns (auth, error handling, logging, security)
-- Deployment & infrastructure overview
-- Key system-wide decisions with full rationale
-- Constraints table — every implementation-shape constraint with its basis and design impact (see Constraint review)
-- Build Order & Checkpoints — the checkpoint ladder: where the loop pauses for the owner, with a poke action and a Verify per rung (see Checkpoint ladder)
+- **The owner reviewing the architecture** reads top-down, often only the first screen, then jumps to one section by number to approve a contract or check a decision. They need the same sections in the same order in every doc, so nothing has to be hunted for.
+- **The engineer building from it** needs implementation-ready detail: field-level types, exact endpoints, error codes, edge cases, budgets. Think of what a staff engineer would produce for a design review at a top tech company.
 
-**Mandatory elements in each `design-<slug>.md`:**
+The layering rule that reconciles them: **orientation on the first screen, depth in §4.** A reader must understand what a component is, how it fits, and how its main flow works from §1–§3 without opening §4, and every detail must sit under the numbered heading the templates assign to it, so "§4.2 of the sharing chapter" is always the contract. A doc written before these templates is brought onto them the next time you edit it for any reason — same content, new sections and numbering, in the same change as the edit; no note about the move.
+
+**`system.md` template** — sections numbered 1–11, in this order, in every project. Sections scale with the project, numbering doesn't: a section or subsection that doesn't apply is omitted, never stubbed and never renumbered, so §9 is Key decisions in a 150-line book and a 900-line one. §1, §3, §9, and §10 always exist.
+
+```markdown
+# <Project> — System Design
+
+> Last updated: <timestamp>
+> Serves: <PRDs with their CUJ ranges>
+> PRDs and mocks define what users see; this book decides how it is built. Where they disagree, the PRD is right and this book is wrong.
+
+## 1. The system in one screen
+Two or three sentences: what the system is and how it runs. Then, still on the first screen:
+- the architecture diagram (Mermaid) — the parts and what talks to what;
+- **The parts** table: Part | Responsibility | Talks to | Chapter (linked);
+- **How to read this book** table (when the book has three or more chapters): "You want to…" | "Read" — the shape of the system (§1, §4),
+  review a contract (that chapter's §4.2), why something is the way it is (§9, then the chapter's §5),
+  where the loop pauses (§10), the rules every component follows (§6, §7).
+
+## 2. Guiding principles
+Numbered. Each principle stated with the engineering consequence it forces.
+
+## 3. Tech stack
+Table: Layer | Choice | Version | Why | Rejected.
+
+## 4. Architecture
+### 4.1 Layers and dependency direction — diagram or table, and how the rule is enforced
+### 4.2 Repository layout — tree with one-line comments; each top-level module names its chapter
+### 4.3 Runtime topology — processes, stores, the deployment unit, how migrations run
+
+## 5. Shared data model
+ER diagram (Mermaid). Table: Entity | Chapter | Key fields | Notes. The conventions every table
+follows (ids, timestamps, soft delete). Field-level detail lives in each chapter's §4.1.
+
+## 6. Shared contracts and conventions
+### 6.1 API conventions — base path, envelope, the shared error-code table (HTTP | code | When),
+    pagination, idempotency, where the generated API description lives
+### 6.2 Auth guard — the default and the one way to opt out
+### 6.3 Configuration — table: Variable | Required | Meaning; validation at boot
+### 6.4 Logging — format, correlation id, what is never logged
+
+## 7. Cross-cutting concerns
+### 7.1 Error handling · 7.2 Security · 7.3 Performance budgets (table: Operation | Budget | Condition)
+### 7.4 Background work · 7.5 Testing strategy (table: Level | Tool | Covers | Gate; the command
+    that boots the product with seed data for QA and for the owner's pokes)
+
+## 8. Constraints
+The Constraints table (see Constraint review): Constraint | Basis | Design impact.
+
+## 9. Key decisions
+Table: ID | Decision | Why | Rejected | Revisit when. D-IDs are stable; chapters cite them.
+
+## 10. Build Order & Checkpoints
+The checkpoint ladder (see Checkpoint ladder).
+
+## 11. Open questions and risks
+OQ-n and R-n, each with a default and the checkpoint at which it is decided or measured.
+```
+
+**`design-<slug>.md` template** — sections numbered 1–8, in this order, in every chapter, under the same omission rule. §1, §3, and §4 (with 4.2 and 4.3) always exist. A small project is a short book: one or two chapters, short sections, same numbers.
 
 The `Last updated` stamp uses local time in the format `YYYY-MM-DD HH:MM:SS (UTC±N)` (e.g., `2026-05-02 14:23:45 (UTC+8)`). Get the current timestamp via `python3 -c "from datetime import datetime as d; t=d.now().astimezone(); m=int(t.utcoffset().total_seconds()//60); s='+' if m>=0 else '-'; h,mm=divmod(abs(m),60); o=f'{h}:{mm:02d}' if mm else str(h); print(t.strftime('%Y-%m-%d %H:%M:%S')+f' (UTC{s}{o})')"`.
 
 ```markdown
-# <Component/Domain Name>
+# <Component>
 
 > Last updated: <timestamp>
-> Serves: prd-001, prd-013, prd-020 (list relevant PRDs)
+> Serves: <PRDs and the CUJs this component carries>
+> Part of: [system.md §1](system.md) → <part name>
 
-## Overview
-What this component does, its responsibilities, and where it sits in the system.
+## 1. Overview
+The card: one table, six rows, each a phrase or one sentence.
 
-## Goals & Non-Goals
-Engineering-specific (not product goals). What this design optimizes for and explicitly does NOT try to solve.
+| | |
+|---|---|
+| **Responsibility** | one sentence |
+| **Owns** | modules, files, tables |
+| **Exposes** | what others call — the count, and a pointer to §4.2 |
+| **Depends on** | components, and the specific services used |
+| **Used by** | who calls this |
+| **Not responsible for** | the nearest things it does not do, each naming who does |
 
-## System Context
-How this component relates to the rest of the system.
-(Mermaid diagram REQUIRED — show this component and its neighbors/dependencies)
+Then the context diagram (Mermaid): this component, its callers, its dependencies — or a link to system.md §1 when that diagram already shows exactly this.
 
-## Detailed Design
+## 2. Goals and non-goals
+Engineering goals this design optimizes for; non-goals it explicitly does not solve, citing the
+PRD line that defers them.
 
-### Data Model
-Concrete type definitions, schemas, or entity descriptions with field-level detail.
-Include constraints, indexes, relationships.
+## 3. How it works
+The main flow as one sequence diagram (Mermaid) plus at most five bullets on what matters about
+it. Readable in one screen; no field-level detail.
 
-### API / Interface Contract
-Exact endpoints, function signatures, message formats, or protocols.
-Include request/response shapes, error codes, status codes.
+## 4. Detailed design
+### 4.1 Data model
+Schema or type definitions with field-level detail; index table (Index | Purpose); invariants.
+### 4.2 Interface contract
+Endpoint or function table (Method and path | Auth | Purpose | Success); request and response
+types; this component's error table (Endpoint | Code | When); response headers where they
+matter; the internal service interface; a **Try it** block — curl or commands against the seeded
+QA server. A seam checkpoint's poke points here.
+### 4.3 Logic and behavior
+Component-specific subsections nest here as H4 (#### 4.3.1 …): state machines (Mermaid
+stateDiagram), algorithms as numbered steps, decision logic as flowcharts, concurrency and
+consistency, and an **Edge cases** table (Case | Behavior).
+### 4.4 UI (if applicable)
+Screens, component hierarchy, client state — or one line pointing at the chapter that owns the UI.
 
-### Logic & Behavior
-Algorithms, state machines, workflows, business rules.
-Use sequence diagrams (Mermaid) for multi-step flows.
-Use flowcharts for decision logic.
-Specify edge cases and error scenarios explicitly.
+## 5. Alternatives considered
+Comparison table: criteria as rows, options as columns, the selected option marked, and a
+**Verdict** row giving the reason each other option lost.
 
-### UI/UX Design (if applicable)
-Screen layouts, component hierarchy, interaction patterns, state management.
+## 6. Cross-cutting concerns
+One bullet each, referencing system.md §7 where the shared rule applies: errors, security,
+performance (this component's number), observability (events and metrics by name), testing
+(what each level covers here).
 
-## Data Flow
-How data moves through this component end-to-end.
-(Mermaid sequence diagram or flowchart REQUIRED)
+## 7. Migration and rollout
+Steps, compatibility, rollback, flags — or one line saying why none is needed.
 
-## Alternatives Considered
-Comparison table with:
-- Options as columns
-- Evaluation criteria as rows (performance, complexity, maintainability, cost, etc.)
-- Clear winner marked with rationale
-
-| Criteria | Option A | Option B | Option C |
-|----------|----------|----------|----------|
-| ...      | ...      | ...      | ...      |
-| **Verdict** | | **Selected** | |
-
-## Cross-Cutting Concerns
-How this component handles (reference system.md where applicable):
-- Error handling & recovery
-- Security & access control
-- Performance (with quantified targets where possible: latency, throughput, data sizes)
-- Observability (logging, metrics, tracing)
-- Testing strategy
-
-## Migration / Rollout (if modifying existing system)
-How to get from current state to target state safely.
-- Migration steps
-- Backward compatibility considerations
-- Rollback plan
-- Feature flags if needed
-
-## Dependencies & Integration Points
-What this component depends on (internal and external).
-What depends on this component.
-
-## Open Questions & Risks
-Unresolved decisions, known risks, areas needing further investigation.
+## 8. Open questions and risks
+OQ-n and R-n, each with a default and the point at which it is decided.
 ```
 
 #### Quality rules — NEVER violate these
 
 - **Every design choice must have explicit rationale.** Never state "we use X" without "because Y."
-- **Use Mermaid diagrams liberally.** Minimum: one system context diagram + one data flow diagram per design doc. Use sequence diagrams for multi-step interactions, flowcharts for decision logic, ER diagrams for data models.
+- **The first screen orients.** §1 of `system.md`, and §1–§3 of a chapter, let a reader understand the shape and the main flow without reading §4. Detail that belongs in §4 does not leak upward; orientation that belongs in §1–§3 is not buried in §4.
+- **Same numbers, every doc.** Never rename, reorder, or renumber a section; omit what doesn't apply rather than stubbing it, so an address like §4.2 means the same thing in a 100-line chapter and a 900-line one. Project-specific structure nests under 4.3 as H4; it never replaces 4.1–4.3.
+- **Use Mermaid diagrams.** Required: the architecture diagram in `system.md` §1 and, when §5 exists, its ER diagram; the flow diagram in §3 of every chapter, and its context diagram unless §1 links to the system diagram instead. Sequence diagrams for multi-step interactions, state diagrams for lifecycles, flowcharts for decision logic.
 - **Use comparison tables** when evaluating alternatives. Criteria as rows, options as columns. Always include a verdict row.
 - **Include concrete type definitions / interface sketches.** Not full implementation code, but precise enough to implement from (field names, types, constraints, method signatures).
 - **Specify error cases and edge cases explicitly.** Happy path alone is not a design — enumerate what can go wrong and how the system handles it.
 - **Name specific libraries/frameworks with version constraints** when recommending dependencies.
 - **Quantify where possible.** Expected latency, data sizes, throughput, storage requirements, concurrency limits. Vague statements like "fast" or "scalable" are not acceptable — give numbers or ranges.
-- **Never be vague or brief.** A design doc that says "use a cache for performance" without specifying what cache, what's cached, TTL strategy, invalidation approach, and memory budget is INCOMPLETE. Always go deep.
+- **Never be vague in §4.** A design doc that says "use a cache for performance" without specifying what cache, what's cached, TTL strategy, invalidation approach, and memory budget is INCOMPLETE. Depth lives in §4 — go deep there, and keep it out of §1–§3.
+- **Split before it sprawls.** When §4.3 passes ten H4 subsections or a chapter passes ~1,000 lines, it is covering more than one engineering boundary: split along that boundary into two chapters and update the parts table in `system.md` §1.
 - **Consider all engineering aspects a real architect would consider:** reliability, scalability, security, observability, testability, operability, cost, developer experience, backwards compatibility.
 
 ### 6. File engineering tasks (docs/eng-backlog.md)
@@ -411,6 +452,7 @@ When `/quality-cycle` accepts a probe-grade mechanism (the experiment proved the
 - Don't write feature implementation code — focus on design, interfaces, code review, and targeted quality fixes
 - Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations, an unexplained constraint that would reshape the architecture)
 - Don't design around a constraint that has no stated reason without raising it — budgeting to an unexamined number and filing it as a risk is how a stand-in turns into a mid-build blocker
+- Don't write a design doc with a changelog header, a renamed, reordered, or renumbered section, a stub for a section that doesn't apply, or a §1 the owner can't read in a minute — same numbers, orientation first, omit rather than pad (Quality bar for design docs)
 - Don't write a checkpoint rung without a poke action and an executable Verify (seam) or a CUJ set (journey) — a rung the owner can't inspect is a status line, not a checkpoint; and never change an approved ladder without listing the diff in your return summary
 - Don't skip reading the code — design docs may be incomplete or stale
 - Don't propose architectures without understanding the existing codebase

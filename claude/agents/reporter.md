@@ -79,9 +79,9 @@ A CUJ is **fully done** when Impl=`merged`, QA=`PASS`, AND PM=`Satisfied`. Any o
 
 | # | Checkpoint | Kind | State | What you can do here |
 |---|---|---|---|---|
-| C1 | Contracts defined | seam | reached (iter 1) | read design-api.md §Interface contract |
+| C1 | Contracts defined | seam | reached (iter 1) | read system.md §5, design-documents.md §4.2 |
 | C2 | Data layer up | seam | reached (iter 2, passed through) | `npm run seed`, then `make db-shell` |
-| C3 | API batch 1 | seam | **current — paused here, awaiting your look** | `./scripts/qa-server.sh start`; curl examples in design-api.md |
+| C3 | API batch 1 | seam | **current — paused here, awaiting your look** | `./scripts/qa-server.sh start`; Try it block in design-documents.md §4.2 |
 | C4 | First journey | journey | pending | walk CUJ-1, CUJ-2 |
 
 `State` values: `reached (iter N)` | `reached (iter N, passed through)` | `current` (append `— paused here, awaiting your look` when loop-state status is `checkpoint`) | `pending`. The last column is the rung's Poke, copied from the ladder. The table in `system.md` is the plan; this one is the progress view.

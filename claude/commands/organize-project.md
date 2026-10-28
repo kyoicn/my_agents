@@ -183,8 +183,8 @@ Write:
 1. docs/design/system.md — cross-cutting: tech stack with rationale,
    high-level architecture diagram (Mermaid), data model overview, API
    conventions, shared patterns, deployment topology. Follow the
-   structure in your role definition's "Mandatory elements in system.md"
-   section.
+   `system.md` template in your role definition's "Quality bar for design
+   docs" section.
 2. docs/design/design-<slug>.md per major component identified — follow
    the per-component template in your role definition. Use slugs that
    match the actual code structure (e.g., design-auth.md, design-sync.md,

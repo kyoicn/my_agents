@@ -327,7 +327,9 @@ Mocks written:  docs/ux/prd-000-<slug>-mockups/  (<count> files; see PRD's Mocks
 Status seeded:  docs/status.md (CUJs added as `not started`)
 
 Next: review the mocks in your browser if you haven't already. When ready,
-run /dev-cycle to start building.
+run /dev-cycle to start building. Its first stop is the checkpoint plan
+review: after architecture review, before any code, it presents where the
+loop will pause for you and waits for your approval.
 ```
 
 ### Route B (new PRD in existing project):
@@ -338,7 +340,9 @@ Mocks written: docs/ux/prd-NNN-<slug>-mockups/  (<count> files)
 PRD index updated: docs/prd/index.md
 Status updated: <count> new CUJs appended as `not started`
 
-Next: run /dev-cycle to build this feature.
+Next: run /dev-cycle to build this feature. It pauses after architecture
+review to present the checkpoint plan — where the loop will stop for you —
+for approval before any code is written.
 ```
 
 ### Route C (extend existing PRD):
@@ -348,7 +352,9 @@ PRD extended: docs/prd/<host-prd-file> (<count> new CUJs appended: <CUJ-IDs>)
 Mocks added: docs/ux/<host-prd-mockups-dir>/  (<count> new files for CUJs <CUJ-IDs>)
 Status updated: <count> new CUJ rows appended as `not started`
 
-Next: run /dev-cycle to build the new CUJs.
+Next: run /dev-cycle to build the new CUJs. Architecture review adds rungs
+for them to the checkpoint plan and pauses for your approval before any
+code is written.
 ```
 
 ### Route D (refine existing CUJs):
@@ -358,7 +364,9 @@ PRD refined: docs/prd/<host-prd-file> (<count> CUJs revised: <CUJ-IDs>)
 Mocks overwritten: docs/ux/<host-prd-mockups-dir>/  (<count> updated files for CUJs <CUJ-IDs>)
 Status reset: <count> CUJ rows reset to Impl=`not started`, QA=`—`, PM=`—`
 
-Next: run /dev-cycle. QA will re-walk these CUJs against the revised spec and mocks.
+Next: run /dev-cycle. Architecture review adjusts the checkpoint plan for the
+revised CUJs and pauses for your approval; QA then re-walks them against the
+revised spec and mocks.
 ```
 
 Substitute every `<placeholder>` with the actual content from PM's return + the orchestrator's Phase 0.5 records. Do not editorialize — the user has everything they need.

@@ -19,9 +19,13 @@ This setup creates a team of specialized AI agents that collaborate in an autono
               │                                             │
        Mocks Check (gate — pause if missing)                │
               │                                             │
-       TL (architecture review)                             │
+       TL (architecture review + checkpoint ladder)         │
               │                                             │
-       Planner (writes docs/tasks.md, severity-prioritized) │
+       Checkpoint Plan Review (first cycle after a PRD      │
+         change: owner approves where the loop will pause)  │
+              │                                             │
+       Planner (writes docs/tasks.md, severity-prioritized, │
+                bounded by the active checkpoint rung)      │
               │                                             │
        Parallel worktree agents execute tasks               │
               │                                             │
@@ -39,7 +43,8 @@ This setup creates a team of specialized AI agents that collaborate in an autono
         │
        PM (review, mark CUJs done, update docs/prd/index.md)
         │
-       Verdict (DONE / CONTINUE / BLOCKED — derived deterministically)
+       Verdict (DONE / CONTINUE / BLOCKED / CHECKPOINT — derived deterministically;
+                CHECKPOINT = a rung reached: owner looks, pokes, says `continue`)
 ```
 
 **Bug fixes (lightweight pipeline):**
@@ -165,7 +170,7 @@ Each row links to the canonical agent definition. The full instructions (Core Pr
 | Agent | Role | Maintains |
 |-------|------|-----------|
 | [`pm`](agents/pm.md) | **Product manager + designer.** Drives feature discovery, produces CUJ shapes AND HTML mocks in lockstep during `/design-feature` sessions, writes PRDs, and reviews implemented work against intent. Held to a principal-designer quality bar (see Quality Bar section in [pm.md](agents/pm.md)). | `docs/prd/` (index + feature PRDs), `docs/ux/<prd-dir>/cuj-*.{html,...}` (mocks) |
-| [`tl`](agents/tl.md) | Software architect — designs systems, makes technical decisions, produces rigorous design docs, and conducts code-quality reviews. | `docs/design/` (`system.md` + per-component design docs) |
+| [`tl`](agents/tl.md) | Software architect — designs systems, makes technical decisions, produces rigorous design docs, authors the checkpoint ladder (where the loop pauses for the owner), and conducts code-quality reviews. | `docs/design/` (`system.md` incl. Build Order & Checkpoints + per-component design docs) |
 | [`planner`](agents/planner.md) | Task decomposer — breaks work into parallelizable tasks; stateless (rewrites `docs/tasks.md` each invocation). | `docs/tasks.md` |
 | [`coder`](agents/coder.md) | Implementation specialist — takes a self-contained task spec (what to do, which files, acceptance criteria) and ships it: writes the code, writes unit tests, runs the type checker, commits with a conventional commit message. Runs in its own git worktree, typically in parallel with other coders, in the background. Does not modify PRDs/design docs/task plans; does not write integration/E2E tests (qa's job); does not review its own code (tl's job). | Branch-scoped commits (no doc artifact) |
 | [`qa`](agents/qa.md) | QA engineer **with gate authority**. Runs tests, drives a real browser (Playwright) and/or Android device (ADB), walks each CUJ twice for flakiness detection, identifies fabrications, compares against mocks under `docs/ux/`, and issues the binding gate verdict. | `docs/qa-report.md` |
@@ -181,7 +186,7 @@ Each row links to the canonical command definition.
 | Command | Purpose |
 |---------|---------|
 | [`/design-feature`](commands/design-feature.md) | Design a product feature conversationally. Routes to one of four outcomes (Route A bootstrap brand-new project / Route B new PRD in existing project / Route C extend existing PRD with new CUJs / Route D refine existing CUJs in place). **CUJ shapes AND HTML mocks are produced together** during the design conversation; mocks save under `docs/ux/<prd-dir>/`; file paths included in every response so the user can `open` them. |
-| [`/dev-cycle`](commands/dev-cycle.md) | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Task Planning → Checkpoint A (commit) → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict → Checkpoint B (commit). Use with `/loop /dev-cycle` for continuous operation. |
+| [`/dev-cycle`](commands/dev-cycle.md) | One iteration of the autonomous loop. Phases: Mocks Check → Architecture Review → Checkpoint Plan Review (first cycle after a PRD change: the owner approves where the loop will pause) → Task Planning → Checkpoint A (commit) → Parallel Execution → Merge → Code Review → QA Gate → Status → PM Review → Verdict (`done` / `continue` / `blocked` / `checkpoint`) → Checkpoint B (commit). `/loop /dev-cycle` runs to the next pause; `--until done` runs through, `--until Cn` pauses at a named rung. |
 | [`/report-bug`](commands/report-bug.md) | Conversational bug intake with screenshot support (clipboard via `pngpaste` → file path → interactive `screencapture` → skip). Writes an h3 block to `docs/issues.md`; screenshots to `docs/issues-attachments/` (gitignored). Optionally chains into `/triage`. |
 | [`/triage`](commands/triage.md) | Diagnose and route issues. Reads issue blocks from `docs/issues.md` (also accepts an issue ID or freeform description). Appends a structured `Triage` field — scope, root cause, files, route, risk — then hands each issue off: run-now routes (`/quick-fix`, `/spec-sync`, `/design-feature`, the spec-conflict question) execute in the session; queued routes (`/dev-cycle`, `/quality-cycle`, `/design-quality`) are taken by that command's next run. |
 | [`/quick-fix`](commands/quick-fix.md) | Fast-path fix for small/medium-scope work items. Operates on a `docs/issues.md` block by ID, an ad-hoc description, or a small `docs/eng-backlog.md` entry (`/quick-fix ENG-NNN` — left for the planner if the entry has an Ordering constraint). Anything not small/medium — at intake or mid-fix — is routed per `/triage`'s table, never refused. Runs the spec-sync check after every fix (Step 6). |
@@ -213,7 +218,11 @@ During the session, the agent saves each mock to disk and includes the absolute 
 **Feature development (autonomous):**
 ```
 /design-feature "<pitch>"           # design the feature + draw mocks together
-/loop /dev-cycle                    # runs the full loop autonomously until done or blocked
+/loop /dev-cycle                    # first stop: the checkpoint plan review (approve where
+                                    # the loop pauses for you); then runs to the next pause —
+                                    # a checkpoint rung, done, or blocked
+continue                            # (in chat) run to the next pause
+/loop /dev-cycle --until done       # run through overnight; --until C4 pauses at that rung
 ```
 
 **Feature development (manual pipeline):**
@@ -320,6 +329,7 @@ All three skills are local-only — no remote pushes, no PRs. You control when t
 21. **Owner throughput is the pipeline's scarcest resource — budget it like one** (first field cycle, F5, F7–F13): every owner decision lives in one queue (now project-level `docs/owner-queue.md` — decision #22; the first field cycle's per-slug `rulings.md` was this decision's prototype; answerable inline or in conversation — the file is the record, not the channel), and the reporter's `status.md` carries a pointer + count to it (the queue file itself names each entry's **current producer** — a handoff that doesn't update it is the violation). Coordination artifacts hold pointers, not narratives — *one fact, one home; queue rows are ID + one line + status word* — because temporary artifacts drift into second state stores by default. Eng dispatch is owner-carried by default in **waves** (`/dev-cycle eng [--for <area>]`: one command drains a batch, exit report leads with the closed/filed/blocking net line), with orchestrator auto-dispatch only under a standing authorization recorded as a ruling. Reports separate change-narration from action-requests so the ask is never buried in the audit trail.
 22. **Owner decisions ride a cross-track rail: a drained queue + a standing-rulings registry, split by lifecycle** (third field retro — the owner: "I have to hunt everywhere for the things that need my attention"): `docs/owner-queue.md` holds everything currently blocked on the owner and nothing else — human-first format (headline question, options with exactly one recommendation, a default with an arming trigger, an answer slot), oldest on top, written in the working language, closed entries deleted (history = git log, the issues.md doctrine — the queue trends toward empty); `docs/rulings.md` holds standing rulings only — append-only, agent-facing, cited by R-ID (one namespace; entries keep their number when promoted). Classification happens **at close, not at filing** — *does this answer govern cases nobody has looked at yet?* — because you often can't know at filing whether an answer will generalize. An **admission gate** keeps it a queue, not a feed: an item enters only when a pipeline is blocked-or-wrong without the answer AND no lower authority (planner ladder, triage table, qspec thresholds, ENG priority) decides it — no FYIs; rows are pointers to the item's home track, never copies. Every decision-making shared-checkout role carries a push-side **registration duty**, stated as a standing write grant that overrides each role's own write list (worktree agents excepted: coder's channel stays `BLOCKER:` and the orchestrator registers, because branch writes die with rejected branches; reporter excepted: it derives, never decides); `docs/rulings.md` is written only by whoever closes an entry; decision-class AskUserQuestions are registered before being asked, so declined and session-killed questions survive; content-confidential items (holdout spot-checks) get existence-stubs with a reconstruction path while contents stay message-only. Drainage is designed in, not hoped for: transient entries arm defaults the per-iteration Setup **sweep** applies; every exit report carries the queue delta + oldest-age line; `scripts/owner-lint.sh` enforces zero *marked* scatter (a vocabulary ratchet, stated as such) with RED defined as ownerless-remediable so the pipeline never blocks on hygiene. Queue size thereby becomes a diagnostic: steady growth means some pipeline is missing a rule and asking where it should be deciding. Alongside, the `status` agent was renamed **`reporter`** — every other agent is named for its role, this one was named for its artifact, and the word collided with three unrelated "status" vocabularies; its charter is now explicit (sole owner of the human-facing view; derives, never decides; its owner section is a pointer + count, never a second record).
 23. **A constraint with no stated reason is a question, not a rule — and asking it is tl's job** (field case: a 1000-line code cap inherited from a pasted brief was specified faithfully, budgeted by tl to a 30-line margin and filed as a risk, and surfaced only when coders hit it mid-build — with escalation options that all kept a cap). The split follows the roles: pm captures product requirements as given — "lightweight" is a legitimate requirement, and interrogating it isn't design's job. The concrete number standing in for it is an architecture decision, so `tl` reviews every implementation-shape constraint (numeric limits, technology bans/mandates, platform rules) at its first design pass and on every PRD change, classifying each by what it rests on: an external fact (verify, design within), an owner decision with a recorded reason (design within, state heavy costs once), or nothing recorded (raise it now — `BLOCKER` when it would reshape the architecture, so the question arrives before any code exists). The review is recorded in `system.md`'s Constraints table, so each constraint is examined once. Every requirement challenge, whoever raises it, follows one format: the headline questions the constraint itself, its origin and reason (or "none recorded") are stated, "drop it" is always an option, and every number states its basis. Rulings are durable; one that changes a requirement routes to pm for a line-scoped PRD amendment citing the R-ID.
+24. **The owner supervises at architectural seams, so the loop pauses on a tl-authored checkpoint ladder — one mechanism, two rung kinds, approved once as a plan** (owner retro: "I'd love to look when the APIs are defined, then when the first batch is implemented — not wait until the whole feature exists; the feature itself can be a very deep stack"). The end-to-end loop had exactly two human boundaries, `done` and `blocked`; everything between them was the planner's parallelism-first cut, which produced states nobody could usefully inspect. The fix is *not* PM-defined product milestones — those sit on CUJ boundaries and force the whole stack before the first look — but a ladder of **seams** in `system.md`'s Build Order & Checkpoints, authored by `tl` because tl owns the seams: **seam rungs** (a contract, a layer, a batch of endpoints; poked by a command; gated by an executable Verify like an ENG entry, confirmed at code review) and **journey rungs** (a CUJ set usable end to end; poked by walking it; gated by the existing two-key gate scoped to those CUJs — so `done` is simply the last journey rung). PM authors no second ladder: its inputs are already in the PRD (Priority, Dependencies, MVP scope); tl cuts the slices from them, the first slice thin through every layer with dense rungs, tapering afterward. Three invariants: **no poke, no rung** (a rung the owner can't inspect in a minute is a status line, and the poke action is planned as part of the rung's work); **the ladder is plan, not progress** (reached rungs live in loop-state and status.md); **never silently modified** (a changed ladder re-enters review as a diff). The owner's interaction has one shape at every pause — look, route (`/report-bug`, Route D, or tell tl), `continue` — and the **checkpoint plan review** (Phase 1.5, the first cycle after a PRD change) is the single queue-bearing pause: the whole ladder is presented as a plan with A approve / B change / C no pauses, no default, the ruling scoped to the PRD. Rung pauses are not queue entries — their only answer is running again. Run-through is a dial, not a mode: `--until done | Cn` on the invocation beats a standing no-pauses ruling in both directions, and passed-through rungs are still verified and recorded. Migration is free: a project without a ladder gets one for its remaining work and exactly one extra pause.
 
 ---
 
@@ -365,7 +375,7 @@ Generated by the loop in any project that uses this setup:
     │   ├── index.md                # PRD master list, vision, personas
     │   └── prd-NNN-<slug>.md       # one per feature
     ├── design/
-    │   ├── system.md               # cross-cutting design (canonical name)
+    │   ├── system.md               # cross-cutting design + checkpoint ladder (canonical name)
     │   └── design-<slug>.md        # per engineering component
     ├── ux/
     │   └── prd-NNN-<slug>-mockups/
@@ -379,7 +389,7 @@ Generated by the loop in any project that uses this setup:
     ├── qa-report.md                # QA agent output
     ├── qa-artifacts/<run-id>/<cuj-id>/run{1,2}/    # <run-id> = iter<N>-<HH-MM-SS>; gitignored
     │   └── *.png                   # screenshots from the QA walks (pm reads them from disk)
-    ├── loop-state.md               # iteration counter + last verdict
+    ├── loop-state.md               # iteration counter + last verdict + reached checkpoint rungs
     ├── issues.md                   # bug intake (h3-block format, written by /report-bug and gorilla)
     ├── issues-attachments/         # bug screenshots — gitignored, deleted on /quick-fix
     │   └── <issue-id>-<N>.png      # one per attached screenshot
@@ -561,6 +571,9 @@ These are project-agnostic instructions for the main agent. Merge with any exist
   escalates (/quick-fix → /dev-cycle) instead of pushing through.
 - When the loop stops "blocked", the decision is yours — answer it and re-run;
   don't hand-patch around a blocker mid-cycle.
+- The loop pauses at the checkpoint rungs you approved (tl's ladder in
+  docs/design/system.md): look, poke, redirect, then `continue`. A pause is not
+  a blocker — nothing waits in the queue except the plan review itself.
 
 ## My Preferences
 ## Execute Tasks
@@ -578,6 +591,16 @@ When I say "execute tasks", "run tasks", "执行任务", "タスクを実行", o
 5. After a group completes, ask me before proceeding to the next group.
 6. After all groups are done, ask me if I want to merge the branches.
 7. Do not modify `docs/tasks.md` — that's the planner's job.
+
+## Continue the loop
+
+When I say "continue", "go on", "继续", "続けて", or similar after a `/dev-cycle`
+pause (status `checkpoint`): run `/loop /dev-cycle` — it iterates until the next
+pause (a checkpoint rung, done, or blocked). `/dev-cycle` alone is one iteration.
+
+When I say "run through", "no checkpoints", "build it end to end", "一口气做完",
+or similar: run `/loop /dev-cycle --until done`. "Run to C4" / "stop at C4" →
+`/loop /dev-cycle --until C4`.
 ````
 
 ---
@@ -648,7 +671,7 @@ Then verify with:
 - `/user:researcher` — should respond as the quality scientist (refuses to touch eval sets, judge assets, or the qspec)
 - `execute tasks` — main agent should read docs/tasks.md and spawn worktree agents with `subagent_type: "coder"`
 - `/design-feature "test pitch"` — should detect context (brand-new vs existing project), drive conversational discovery in the main thread, and route to bootstrap / new PRD / extend / refine
-- `/dev-cycle` — should run one full autonomous iteration
+- `/dev-cycle` — should run one full autonomous iteration; on a project with no approved checkpoint ladder it should stop after architecture review and present the checkpoint plan (A approve / B change / C no pauses)
 - `/report-bug "test bug"` — should drive conversational intake, attempt screenshot capture (prompts you through the options), write an h3 block to `docs/issues.md`, and ensure `docs/issues-attachments/` is in `.gitignore`
 - `/triage` (or `/triage <issue-id>`) — should diagnose open issue blocks, append a `Triage` field (with Route) to each, then hand each off — running `/quick-fix` / `/spec-sync` / `/design-feature` now, or reporting it as queued for `/dev-cycle` / `/quality-cycle`
 - `/quick-fix <issue-id>` — should fix the issue and remove the block + its referenced screenshots
@@ -661,4 +684,4 @@ Then verify with:
 - `/worktree-start test-parallel` — should create `../<repo>-test-parallel` on a new `feature/test-parallel` branch and open it in a new Antigravity window
 - `/worktree-sync` (from inside that worktree, after committing something) — should two-way merge with main and leave the worktree intact
 - `/worktree-finish` (from inside that worktree, when done) — should merge into main with `--no-ff`, remove the worktree, delete the branch
-- `/loop /dev-cycle` — should run autonomous iterations until done or blocked
+- `/loop /dev-cycle` — should run autonomous iterations until the next pause: a checkpoint rung, done, or blocked (`--until done` runs through; `--until C3` pauses at that rung)

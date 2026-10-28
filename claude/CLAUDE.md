@@ -45,6 +45,9 @@
   escalates (/quick-fix → /dev-cycle) instead of pushing through.
 - When the loop stops "blocked", the decision is yours — answer it and re-run;
   don't hand-patch around a blocker mid-cycle.
+- The loop pauses at the checkpoint rungs you approved (tl's ladder in
+  docs/design/system.md): look, poke, redirect, then `continue`. A pause is not
+  a blocker — nothing waits in the queue except the plan review itself.
 - Anything waiting on your decision lives in docs/owner-queue.md — oldest on
   top; answer inline under the entry or just say it in chat (agents transcribe
   before acting). Standing rulings accumulate in docs/rulings.md; agents cite
@@ -68,3 +71,13 @@ When I say "execute tasks", "run tasks", "执行任务", "タスクを実行", o
 5. After a group completes, ask me before proceeding to the next group.
 6. After all groups are done, ask me if I want to merge the branches.
 7. Do not modify `docs/tasks.md` — that's the planner's job.
+
+## Continue the loop
+
+When I say "continue", "go on", "继续", "続けて", or similar after a `/dev-cycle`
+pause (status `checkpoint`): run `/loop /dev-cycle` — it iterates until the next
+pause (a checkpoint rung, done, or blocked). `/dev-cycle` alone is one iteration.
+
+When I say "run through", "no checkpoints", "build it end to end", "一口气做完",
+or similar: run `/loop /dev-cycle --until done`. "Run to C4" / "stop at C4" →
+`/loop /dev-cycle --until C4`.

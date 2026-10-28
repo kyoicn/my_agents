@@ -30,6 +30,7 @@ If the prompt declares neither, assume interactive only when a live user is actu
 - **Optimize for efficiency**: Prefer task groupings that minimize total wall-clock time. A plan with 3 parallel tasks is better than 3 sequential tasks, even if the parallel version has slightly more total work.
 - **Concrete and actionable**: Each task must be specific enough that an agent can pick it up with zero additional context — include file paths, component names, and clear acceptance criteria.
 - **Document authority — never silently resolve a contradiction**: user intent > PRD > design docs > tasks.md. PRDs define *what* (user-visible behavior); design docs define *how* (implementation approach). When they conflict on user-visible behavior: plan per the PRD, cite the governing CUJ/acceptance criterion verbatim in the task spec (so the coder builds against the right source), and record the contradiction in the plan's Current State section so tl reconciles the design doc next cycle. If you genuinely cannot tell which document is stale, escalate (interactive: ask; autonomous: `BLOCKER`). Quietly siding with whichever document is closer to the code is the one prohibited move.
+- **Plan to the active rung**: `system.md`'s **Build Order & Checkpoints** ladder (when it exists) fixes the build order and where the owner pauses to look. Your plan covers the work needed to reach the **active rung** — the lowest unreached rung, named in your prompt or derived from `docs/loop-state.md`'s Checkpoints section — and nothing past it. Bugs and `blocking` ENG entries still come first (tiers 1–2 of the priority ladder); the rung bounds tier 3. Within the rung, maximize parallelism as usual. A seam rung's poke action (a seed script, curl examples, an OpenAPI page) is a task in the rung, not an afterthought — the rung is not reachable without it.
 - **Minimize cross-task conflicts**: Design task boundaries so agents won't edit the same files. When unavoidable, note it explicitly.
 - **Owner decisions go through the queue**: a decision only the owner can make (planning blocks or goes wrong without it, and neither the priority ladder nor the docs decide it) is filed in `docs/owner-queue.md` per the Owner Decision Protocol (`dev-cycle.md` Setup) — cite the R-NNN in your plan summary. Check `docs/rulings.md` (standing rulings) before asking; never file FYIs.
 - **Quality surfaces are eval-triggering**: if a task touches files named in a `docs/quality/*/qspec.md` Surface section (prompt templates, pipeline modules), its "Done when" must include the mechanical smoke run — `scripts/eval-runner.sh <slug> gen <run-id> smoke` finishes and produces an output for every smoke case. That proves the pipeline still runs; whether output quality regressed is scored by the evaluator in `/dev-cycle` Phase 4, never by the coder. But *improving* graded quality is never yours to decompose: that's `/quality-cycle`'s hypothesis loop (researcher designs experiments there, not you). If pm-review or the backlog asks for "better summaries," the task you write is "run /quality-cycle <slug>", not a decomposition of quality work.
@@ -50,7 +51,7 @@ Before decomposing anything, build a thorough understanding from the sources of 
 - `docs/prd/index.md` — project-level PRD index with product vision and PRD listing — **this is the primary entry point**
 - `docs/prd/prd-NNN-*.md` — feature-level PRDs with detailed CUJ specs — **read active PRDs for implementation detail** (skip `deprecated` ones)
 - `docs/status.md` — current status snapshot (if it exists; verify against actual code since it may be stale)
-- `docs/design/system.md` — cross-cutting system design and constraints
+- `docs/design/system.md` — cross-cutting system design, constraints, and the **Build Order & Checkpoints** ladder (if present — the active rung bounds this plan; `docs/loop-state.md`'s Checkpoints section records which rungs are reached)
 - `docs/design/design-*.md` — component/domain-level design docs
 - `docs/qa-report.md` — engineering-side per-CUJ verdicts (PASS/FAIL/BLOCKED/etc.) and bug list (if it exists — failures become tasks). **This is the canonical source for "what's done on the engineering side."**
 - `docs/pm-review.md` — product-side per-CUJ verdicts (Satisfied/Caveats/Not done) plus recommended next-iteration priorities (if it exists — Caveats and Not-done become tasks; the priority list is your top input for what to plan).
@@ -82,6 +83,7 @@ Within tier 3:
 - Respect CUJ dependency ordering — if CUJ-B depends on CUJ-A, CUJ-A must be in an earlier parallel group.
 - If `docs/pm-review.md` exists, **its "Recommended Next-Iteration Priorities" list is your starting order** — PM has already done strategic sequencing for you. Adjust only for hard dependencies or fresh signal you see in the code.
 - Identify the highest-impact unfinished CUJs.
+- If a checkpoint ladder exists, take only the CUJs and components in the active rung's Scope. Work past the rung waits — even when it would parallelize nicely — because the rung is where the owner looks before the next layer lands on top.
 - Factor in recent momentum — if the user has been working on area X, adjacent work in X may be higher priority.
 - **Interactive mode**: present your recommended focus to the user and get confirmation before proceeding. **Autonomous mode**: proceed with the ladder's ordering directly.
 
@@ -154,6 +156,7 @@ Last updated: <timestamp>
 
 ## Current State
 <Brief summary of where the project stands and what the current focus is>
+Active checkpoint: <Cn — title; this plan reaches it> | no ladder
 
 ## Parallel Group 1
 
@@ -194,4 +197,5 @@ When deciding how to split work, consider these natural boundaries:
 - Don't skip reading the codebase — decomposition without understanding leads to bad boundaries
 - Don't write the task plan without user approval in interactive mode — in autonomous mode the loop's QA and PM gates are the approval; write directly
 - Don't plan work that's already done — always verify against actual code, not just docs
+- Don't plan past the active checkpoint rung — the owner pauses there for a reason; a plan that reaches C3 and "also starts C4's UI" defeats the pause
 - Don't park owner-pending items anywhere but `docs/owner-queue.md` — no "waiting on the owner" notes buried in the plan; register (R-NNN) and point

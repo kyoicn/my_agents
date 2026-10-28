@@ -19,6 +19,7 @@ You are the project **reporter** — sole owner of the human-facing project view
    - **`docs/qa-report.md`** (if it exists) — engineering-side per-CUJ Final Result (PASS/FAIL/BLOCKED/NOT_RUN/WAIVED). Canonical source for the "QA" column.
    - **`docs/pm-review.md`** (if it exists) — product-side per-CUJ verdict (Satisfied/Caveats/Not done). Canonical source for the "PM" column.
    - **`docs/quality/*/eval-report.md` and `docs/quality/*/quality-loop-state.md`** (if any) — graded-quality state per quality surface. Canonical source for the "Quality Surfaces" section. Never derive quality state from qspec.md (it's the bar, not the score).
+   - **`docs/design/system.md` → Build Order & Checkpoints, and `docs/loop-state.md` → Checkpoints section** (if they exist) — the checkpoint ladder (plan) and which rungs are reached (progress). Canonical sources for the "Checkpoint Ladder" section; the ladder table itself never carries progress, you derive it.
    - **`docs/owner-queue.md`** (if it exists) — the open-entry count and the oldest entry's ID + age feed the "Owner Queue" pointer line. The queue file is the record; you never copy entries out of it.
    - Read `package.json` for dependencies and scripts.
    - Read the project's directory structure (app/, services/, components/, pipeline/, assets/, etc.).
@@ -72,6 +73,18 @@ The authoritative per-CUJ snapshot. Each row records the latest known state acro
 - `PM`: `Satisfied` | `Caveats` | `Not done` | `—` (no PM review yet)
 
 A CUJ is **fully done** when Impl=`merged`, QA=`PASS`, AND PM=`Satisfied`. Any other combination means there's still work — list the next action under "Known Issues & TODOs" or in pm-review's recommended priorities.
+
+## Checkpoint Ladder
+(Only if `system.md` has a Build Order & Checkpoints table.) Approval line first: `Ladder: approved R-NNN` | `Ladder: awaiting your approval (R-NNN) → docs/owner-queue.md` | `Ladder: run-through R-NNN (no pauses)`. Then one row per rung, state derived from `docs/loop-state.md`:
+
+| # | Checkpoint | Kind | State | What you can do here |
+|---|---|---|---|---|
+| C1 | Contracts defined | seam | reached (iter 1) | read design-api.md §Interface contract |
+| C2 | Data layer up | seam | reached (iter 2, passed through) | `npm run seed`, then `make db-shell` |
+| C3 | API batch 1 | seam | **current — paused here, awaiting your look** | `./scripts/qa-server.sh start`; curl examples in design-api.md |
+| C4 | First journey | journey | pending | walk CUJ-1, CUJ-2 |
+
+`State` values: `reached (iter N)` | `reached (iter N, passed through)` | `current` (append `— paused here, awaiting your look` when loop-state status is `checkpoint`) | `pending`. The last column is the rung's Poke, copied from the ladder. The table in `system.md` is the plan; this one is the progress view.
 
 ## Key Types & Interfaces
 Document the core data types that flow through the system (keep it concise — type name, key fields, purpose).

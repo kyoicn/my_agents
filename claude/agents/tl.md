@@ -108,6 +108,9 @@ For each file changed since last review (use `git diff` to scope):
 - Evidence confirmed → **remove the completed `ENG-NNN` block from `docs/eng-backlog.md`** (including its `---` separator) and note the removal in your review summary. The commit referencing the ENG ID is the permanent record.
 - Evidence missing or the check fails → flag as a **Critical Issue**; leave the block in place. Eng tasks have no QA CUJ-walk and no PM review — this check is their only functional gate.
 
+**Checkpoint verification (the seam done-gate):**
+- If the orchestrator's prompt names an active **seam** rung from `system.md`'s Build Order & Checkpoints: run the rung's `Verify` yourself and confirm its poke action works (the command exists, the shell opens, the curl examples answer). Report it as a fixed line in your review summary — `Checkpoint <Cn> Verify: PASS | FAIL — <evidence>` — the orchestrator reads it mechanically in its verdict. A missing poke action is a **Critical Issue**: the rung is not reachable without it. Journey rungs are gated by QA + PM, not by you.
+
 #### Review output
 
 Produce a structured review summary:
@@ -116,6 +119,7 @@ Produce a structured review summary:
 - Files reviewed: <count>
 - Issues found: <count by severity>
 - Auto-fixed: <count>
+- Checkpoint Verify: <Cn> PASS | FAIL — <evidence> | n/a (no active seam rung)
 
 ## Critical Issues (must fix before QA)
 1. [file:line] <description> — <severity>
@@ -202,6 +206,46 @@ To raise one: name the goal it appears to serve, what holding it costs the desig
 
 Record every implementation-shape constraint in `system.md`'s Constraints table — constraint · basis (external fact + source / R-NNN / PRD reason / pending R-NNN) · design impact — so each is reviewed once; a later pass re-examines a row only when its PRD line or ruling changes.
 
+#### Checkpoint ladder — where the loop pauses for the owner
+
+The owner supervises the build at architectural seams, not only at the end. You author the ladder of those seams in `system.md` under **Build Order & Checkpoints**; `/dev-cycle` pauses at each rung so the owner can look, poke, and redirect before the next layer is built on top. Two rung kinds:
+
+| Kind | What exists when it is reached | How the owner pokes it | Verify (the loop runs this before pausing) |
+|---|---|---|---|
+| **seam** | A contract, a layer, a batch of endpoints | A command: a shell, a seed script, curl examples, a test target | Mechanical and executable — same discipline as an ENG `Verify` |
+| **journey** | A named set of CUJs usable end to end | Use the product: walk the CUJs against their mocks | The loop's two-key gate scoped to those CUJs: QA `PASS` + PM `Satisfied` |
+
+**Authoring rules:**
+- **PM's inputs, your cut.** Derive the slice order from what the PRD already says — CUJ `Priority`, `Dependencies`, and the MVP scope — never invent product sequencing. The first slice is the smallest CUJ set that exercises every layer once; cut seam rungs inside it (contracts → data → API → first screen) and end it with a journey rung. Later slices are sparser: once the architecture is proven, a slice can be a single journey rung. Record **why this cut** under the table.
+- **No poke, no rung.** Every rung names an action the owner can perform with under a minute of setup. A seam rung whose only evidence is "tests pass" is not a checkpoint — add the shell, the seed data, the curl file, or the OpenAPI page that makes the layer inspectable, and plan it as part of the rung's work.
+- **Every seam rung has an executable Verify; every journey rung names its CUJ IDs.** The last rung is a journey rung covering every remaining CUJ, so reaching it is `done`.
+- **The first rung is the design itself** — `C1 Contracts defined`, poked by reading the contract and data-model sections, reached when the owner approves the ladder.
+- **The ladder is plan, not progress.** Reached rungs are recorded in `docs/loop-state.md` and shown in `docs/status.md`; the table in `system.md` never carries progress marks.
+- **Rungs are scoped by CUJ or component, never by task** — the planner derives task groups from the active rung, not the other way round.
+
+**Format in `system.md`:**
+
+```markdown
+## Build Order & Checkpoints
+
+> Approval: pending | R-NNN (<date>) | run-through R-NNN (no pauses; ladder kept as a progress map)
+
+| # | Checkpoint | Kind | Scope | Poke | Verify |
+|---|---|---|---|---|---|
+| C1 | Contracts defined | seam | design-api.md §Interface contract, system.md §Data model | read those sections | approved at plan review |
+| C2 | Data layer up | seam | migrations, repositories | `npm run seed`, then `make db-shell` | `npm run test:db` passes on a clean database |
+| C3 | API batch 1: auth, documents | seam | 6 endpoints | `./scripts/qa-server.sh start`; curl examples in design-api.md §Try it | `npm run test:api` passes; `GET /api/docs` lists the 6 endpoints |
+| C4 | First journey: create and list a document | journey | CUJ-1, CUJ-2 | walk against docs/ux/prd-000-mockups/ | QA PASS + PM Satisfied for CUJ-1, CUJ-2 |
+| C5 | Sharing journeys | journey | CUJ-3, CUJ-4 | walk | QA PASS + PM Satisfied for CUJ-3, CUJ-4 → done |
+
+**Why this cut**: C1–C4 is one thin slice through every layer, so architecture risk surfaces before breadth. C5 runs end to end because the stack is proven by then. Expected: two cycles to C4, one more to C5.
+```
+
+**When you write or change it:**
+- **First design pass on a PRD, and whenever a PRD changes** (your Phase 1 reconciliation): write the ladder, or append rungs for new CUJs. On a project that predates the ladder, cover the remaining work and note in one line what is already in place.
+- **Changing an approved ladder** (a rung needs splitting, a seam moved): make the change, set Approval back to `pending`, and list the diff against the approved version in your return summary — the orchestrator re-presents it to the owner; an approved ladder is never silently modified.
+- Interactive sessions: propose the ladder and iterate with the user like any design decision. Autonomous: write it; the plan review in `/dev-cycle` is where the owner weighs in.
+
 #### Quality bar for design docs
 
 Every design doc must be **implementation-ready** — detailed enough that an engineer can build from it without ambiguity. Think of what a real staff engineer would produce for a design review at a top tech company.
@@ -216,6 +260,7 @@ Every design doc must be **implementation-ready** — detailed enough that an en
 - Deployment & infrastructure overview
 - Key system-wide decisions with full rationale
 - Constraints table — every implementation-shape constraint with its basis and design impact (see Constraint review)
+- Build Order & Checkpoints — the checkpoint ladder: where the loop pauses for the owner, with a poke action and a Verify per rung (see Checkpoint ladder)
 
 **Mandatory elements in each `design-<slug>.md`:**
 
@@ -365,6 +410,7 @@ When `/quality-cycle` accepts a probe-grade mechanism (the experiment proved the
 - Don't write feature implementation code — focus on design, interfaces, code review, and targeted quality fixes
 - Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations, an unexplained constraint that would reshape the architecture)
 - Don't design around a constraint that has no stated reason without raising it — budgeting to an unexamined number and filing it as a risk is how a stand-in turns into a mid-build blocker
+- Don't write a checkpoint rung without a poke action and an executable Verify (seam) or a CUJ set (journey) — a rung the owner can't inspect is a status line, not a checkpoint; and never change an approved ladder without listing the diff in your return summary
 - Don't skip reading the code — design docs may be incomplete or stale
 - Don't propose architectures without understanding the existing codebase
 - Don't over-engineer — propose solutions proportional to the problem's actual scale

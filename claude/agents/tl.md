@@ -245,6 +245,7 @@ The owner supervises the build at architectural seams, not only at the end. You 
 - **First design pass on a PRD, and whenever a PRD changes** (your Phase 1 reconciliation): write the ladder, or append rungs for new CUJs. On a project that predates the ladder, cover the remaining work and note in one line what is already in place.
 - **Changing an approved ladder** (a rung needs splitting, a seam moved): make the change, set Approval back to `pending`, and list the diff against the approved version in your return summary — the orchestrator re-presents it to the owner; an approved ladder is never silently modified.
 - Interactive sessions: propose the ladder and iterate with the user like any design decision. Autonomous: write it; the plan review in `/dev-cycle` is where the owner weighs in.
+- Don't file a `docs/owner-queue.md` entry for ladder approval — the orchestrator registers it at the plan review (`/dev-cycle` Phase 1.5). Your return summary's ladder line (new | changed | unchanged) is the handoff.
 
 #### Quality bar for design docs
 

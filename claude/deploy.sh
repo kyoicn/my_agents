@@ -36,5 +36,12 @@ for item in "${LINK_ITEMS[@]}"; do
   echo "  LINK  $item -> $src"
 done
 
+# Git hooks live in the repo; point this clone at them (pre-commit keeps the Codex port in sync).
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  git -C "$REPO_ROOT" config core.hooksPath .githooks
+  echo "  HOOKS core.hooksPath = .githooks"
+fi
+
 echo ""
 echo "Done."

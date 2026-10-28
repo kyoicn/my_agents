@@ -1,41 +1,31 @@
 ---
 name: "sync-from-claude"
-description: "Sync Codex agents and skills from the canonical Claude definitions in this repo, preserving Codex-native behavior and target-local Codex skills."
+description: "Regenerate the Codex port (agents, skills, AGENTS.md) from the canonical Claude definitions in this repo, with Codex-native behavior carried by the generator's mapping layer rather than by hand edits."
 ---
 
 # sync-from-claude
 
 Use this skill when asked to sync, refresh, regenerate, or update the `codex/` target from the canonical `claude/` definitions.
 
-## Ground Rules
+## How Codex behavior is preserved
 
-- Treat `claude/` as read-only canonical input.
-- Keep target-local Codex skills, including this skill, under `codex/skills/`.
-- Keep `codex/skills/sync-from-claude/scripts/sync-from-claude.sh` simple and deterministic. It should do structural conversion only: parse Claude frontmatter, emit Codex files, preserve target-local skills, and apply obvious path wording such as `CLAUDE.md` to `AGENTS.md`.
-- Regenerate Codex-native instruction quality in the LLM review pass after running the script. Do not add semantic rewrite tables or large target-specific templates to the script unless the user explicitly asks.
-- Do not deploy to `~/.codex` unless the user explicitly asks.
+The Claude sources are written for Claude Code. The generator (`scripts/sync-from-claude.sh`) carries the Codex translation in three places, all of which survive every regeneration — never hand-edit a generated file:
+
+1. **Deterministic rewrites** inside the script: `/command` → `$command` (for every `claude/commands/*.md` stem, never inside paths), `CLAUDE.md` → `AGENTS.md`, `~/.claude/...` → `~/.codex/...`, `claude/agents/x.md` → `~/.codex/agents/x.toml`, `subagent_type` → `agent_type`. A short skip list (`SKIP_SKILLS`) names Claude commands with no Codex counterpart.
+2. **`platform-notes.md`**, prepended to every generated agent, skill, and `AGENTS.md`: how to read the remaining Claude constructs on Codex — `spawn_agent`/`wait_agent` for subagents, in-repo `git worktree` for `isolation: "worktree"`, "ask in the final message and end the turn" for `AskUserQuestion`, `$x` repeated in-turn for `/loop`.
+3. **Overrides**: `overrides/<name>.md` replaces a `<!-- SYNC:<name> -->` block in a Claude source (used by qa for browser tooling); `overrides/agents/<name>.md` and `overrides/skills/<name>.md` are appended to that artifact as a "Codex adaptations" section (used by `coder` and `dev-cycle` for the worktree recipe and owner questions).
+
+Generated files carry a `generated-from` marker; the script deletes and recreates them. Skills without the marker (this one) are left alone.
 
 ## Workflow
 
-1. Read `codex/skills/sync-from-claude/scripts/sync-from-claude.sh` and relevant files under `claude/agents/` and `claude/commands/`.
-2. Run `./codex/skills/sync-from-claude/scripts/sync-from-claude.sh`.
-3. Verify shell syntax with `bash -n codex/skills/sync-from-claude/scripts/sync-from-claude.sh codex/deploy.sh`.
-4. Inspect and rewrite representative generated files as needed:
-   - `codex/agents/planner.toml`
-   - `codex/skills/dev-cycle/SKILL.md`
-   - `codex/skills/quick-fix/SKILL.md`
-   - `codex/skills/triage/SKILL.md`
-5. During the LLM rewrite pass, preserve the Claude source intent but translate runtime assumptions into Codex-native behavior. Check especially for:
-   - slash-command-only language
-   - `CLAUDE.md` references
-   - `isolation: "worktree"`
-   - `run_in_background: true`
-   - guaranteed per-agent branches or automatic branch merges
-   - Claude tool names or model names presented as Codex configuration
-6. If a generated file needs a Codex-native rewrite, edit that generated file directly after sync. This is expected: generated command and agent contents are refreshed by the LLM each sync for quality.
-7. Keep changes focused on generated Codex artifacts and this skill's workflow. Do not modify `claude/`.
-8. If the user asks to deploy, run `./codex/deploy.sh` and verify the relevant symlinks under `~/.codex`.
+1. Run `./codex/skills/sync-from-claude/scripts/sync-from-claude.sh`.
+2. Verify: `bash -n` both scripts; parse every `codex/agents/*.toml` (`tomllib` on Python ≥ 3.11, otherwise `tomli`): `python3 -c 'import sys\ntry: import tomllib as t\nexcept ModuleNotFoundError: import tomli as t\n[t.load(open(p,"rb")) for p in sys.argv[1:]]' codex/agents/*.toml`.
+3. Read the generated `codex/skills/dev-cycle/SKILL.md` and one agent (e.g. `codex/agents/coder.toml`) for Claude-only constructs the mapping layer missed: a tool name, a path, a slash command, an isolation flag. Fix them **in the mapping layer** (script rewrite, `platform-notes.md`, or an override file), then re-run — not in the generated file.
+4. Report what changed, what the mapping layer still does not cover, and whether deployment was performed.
 
-## Output Standard
+## Ground rules
 
-Report what changed, what was generated, whether any Codex-native concerns remain, and whether deployment was performed.
+- Treat `claude/` as read-only canonical input.
+- Keep the script structural and deterministic. New semantics go in `platform-notes.md` or an override file, not in regex.
+- Do not deploy to `~/.codex` unless the user explicitly asks. `./codex/deploy.sh` links agents, skills, and `AGENTS.md` (backing up a hand-written `~/.codex/AGENTS.md`), and prunes links into this repo whose targets no longer exist.

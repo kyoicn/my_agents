@@ -106,10 +106,17 @@ Adopting an existing codebase? Run `/organize-project` once to retrofit it into 
 | Platform | Directory | Coverage |
 |---|---|---|
 | **Claude Code** | [`claude/`](claude/) | Full setup — source of truth |
-| **OpenAI Codex** | [`codex/`](codex/) | Full setup, generated from the Claude source by `codex/skills/sync-from-claude` |
-| **Google Antigravity** | [`antigravity/`](antigravity/) | Legacy port (IDE knowledge items) — targets a directory current Antigravity no longer documents; rebuild pending |
+| **OpenAI Codex** | [`codex/`](codex/) | Full setup, generated from the Claude source by `codex/skills/sync-from-claude` (custom agents as TOML, skills, AGENTS.md) |
+| **Google Antigravity** | [`antigravity/`](antigravity/) | Full setup, generated from the Claude source by `antigravity/skills/sync-from-claude` (custom agents, skills, GEMINI.md) |
 
-Each directory has its own `deploy.sh`. The Claude Code setup is canonical. The Codex port is regenerated deterministically: after any change under `claude/`, run `./codex/skills/sync-from-claude/scripts/sync-from-claude.sh` and commit `codex/` in the same commit. `sync-from-claude.sh --check` refuses a stale port; the pre-commit hook in `.githooks/` and `codex/deploy.sh` both run it. Activate the hook once per clone with `git config core.hooksPath .githooks` (`claude/deploy.sh` does this).
+Each directory has its own `deploy.sh`. The Claude Code setup is canonical. The ports are regenerated deterministically: after any change under `claude/`, run both sync scripts and commit `codex/` and `antigravity/` in the same commit:
+
+```bash
+./codex/skills/sync-from-claude/scripts/sync-from-claude.sh
+./antigravity/skills/sync-from-claude/scripts/sync-from-claude.sh
+```
+
+Each script's `--check` refuses a stale port; the pre-commit hook in `.githooks/` and each `deploy.sh` run it. Activate the hook once per clone with `git config core.hooksPath .githooks` (`claude/deploy.sh` does this).
 
 ---
 

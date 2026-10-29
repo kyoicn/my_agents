@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Refuse a commit whose staged Codex port is stale relative to the staged Claude sources.
-# Activated per clone by `git config core.hooksPath .githooks` (claude/deploy.sh does this).
+# Refuse a commit whose staged Codex or Antigravity port is stale relative to the
+# staged Claude sources. Activated per clone by `git config core.hooksPath .githooks`
+# (claude/deploy.sh does this).
 set -euo pipefail
 
-if git diff --cached --quiet -- claude codex; then
+if git diff --cached --quiet -- claude codex antigravity; then
   exit 0
 fi
 
@@ -11,9 +12,16 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 git checkout-index -a --prefix="$tmp/"
 
-if ! bash "$tmp/codex/skills/sync-from-claude/scripts/sync-from-claude.sh" --check; then
+stale=0
+for port in codex antigravity; do
+  if ! bash "$tmp/$port/skills/sync-from-claude/scripts/sync-from-claude.sh" --check; then
+    stale=1
+  fi
+done
+
+if [[ $stale -eq 1 ]]; then
   echo "" >&2
-  echo "pre-commit: the staged Codex port does not match the staged Claude sources." >&2
-  echo "Fix: ./codex/skills/sync-from-claude/scripts/sync-from-claude.sh && git add -A codex" >&2
+  echo "pre-commit: a staged port does not match the staged Claude sources." >&2
+  echo "Fix: run the sync script(s) listed above, then git add -A codex antigravity" >&2
   exit 1
 fi

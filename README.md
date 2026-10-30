@@ -4,7 +4,7 @@
 
 You describe what to build. The agents design it with you, plan it, build it in parallel git worktrees, test it in a real browser, and stop with a clear question whenever a decision is genuinely yours.
 
-Works on **Claude Code** (reference implementation, used in all examples below), with ports for **OpenAI Codex** and **Google Antigravity** — see [Platforms](#platforms). Everything is markdown conventions in your project's `docs/` — no databases, no services.
+Works on **Claude Code** (reference implementation, used in all examples below), with ports for **OpenAI Codex**, **Google Antigravity**, and **OpenCode** — see [Platforms](#platforms). Everything is markdown conventions in your project's `docs/` — no databases, no services.
 
 ---
 
@@ -108,12 +108,14 @@ Adopting an existing codebase? Run `/organize-project` once to retrofit it into 
 | **Claude Code** | [`claude/`](claude/) | Full setup — source of truth |
 | **OpenAI Codex** | [`codex/`](codex/) | Full setup, generated from the Claude source by `codex/skills/sync-from-claude` (custom agents as TOML, skills, AGENTS.md) |
 | **Google Antigravity** | [`antigravity/`](antigravity/) | Full setup, generated from the Claude source by `antigravity/skills/sync-from-claude` (custom agents, skills, GEMINI.md) |
+| **OpenCode** | [`opencode/`](opencode/) | Full setup, generated from the Claude source by `opencode/skills/sync-from-claude` (agents, commands, AGENTS.md) |
 
-Each directory has its own `deploy.sh`. The Claude Code setup is canonical. The ports are regenerated deterministically: after any change under `claude/`, run both sync scripts and commit `codex/` and `antigravity/` in the same commit:
+Each directory has its own `deploy.sh`. The Claude Code setup is canonical. The ports are regenerated deterministically: after any change under `claude/`, run all three sync scripts and commit `codex/`, `antigravity/`, and `opencode/` in the same commit:
 
 ```bash
 ./codex/skills/sync-from-claude/scripts/sync-from-claude.sh
 ./antigravity/skills/sync-from-claude/scripts/sync-from-claude.sh
+./opencode/skills/sync-from-claude/scripts/sync-from-claude.sh
 ```
 
 Each script's `--check` refuses a stale port; the pre-commit hook in `.githooks/` and each `deploy.sh` run it. Activate the hook once per clone with `git config core.hooksPath .githooks` (`claude/deploy.sh` does this).

@@ -1,0 +1,142 @@
+---
+description: "Fix a small-scope work item directly — a defect from docs/issues.md, an ad-hoc description, or a small engineering task from docs/eng-backlog.md (quick-fix ENG-NNN). Triages first (if not already triaged), then implements, runs tests, and commits. Anything that isn't small-scope is routed per /triage's table instead of fixed here; ENG entries with Ordering constraints stay in the backlog for the planner."
+---
+<!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
+
+> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
+> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
+> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
+> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
+> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+
+# Quick Fix
+
+You are fixing a small-scope work item — a clear bug, spec deviation, or defect that can be resolved in 1-3 files without design changes, or a small engineering task from `docs/eng-backlog.md` with the same profile.
+
+## Input
+
+Check how you were invoked:
+- **With an issue ID** (e.g., `quick-fix 2026-06-03-14-30-25`): Read that specific h3 block from `docs/issues.md` and fix it. If the block has a `Triage` field, use it as the diagnosis (verify against current code quickly). If not, run the triage logic from `/triage` inline first.
+- **With an ENG ID** (e.g., `quick-fix ENG-004`): Read that h3 block from `docs/eng-backlog.md`. The entry's Scope/Acceptance criteria/Verify fields are the spec — no triage needed. Two eligibility gates before touching code:
+  - The entry must pass the same small-scope gate as a defect (1-3 files, no design change, no shared interface or data-model change). Larger → leave it in the backlog and tell the user the next `/dev-cycle` schedules it (the planner reads the backlog).
+  - The entry must have **no `Ordering` field**. Ordering constraints are honored by the planner's group sequencing; ad-hoc execution loses them. Constrained → same: it stays in the backlog for the planner.
+- **With a direct description** (e.g., `quick-fix "articles aren't sorted by date"`): Triage and fix that ad-hoc description in one shot, without going through `docs/issues.md`.
+- **Without arguments**: Read `docs/issues.md`, pick the first **triaged** small/medium-scope block (one whose `Triage` field shows scope=small or scope=medium), and fix it.
+
+**Only small or medium scope is fixed here**, wherever the diagnosis came from — an existing `Triage` field, your inline triage, or an ENG entry's fields. Any other scope is routed per Step 1, never fixed here because a diagnosis already exists.
+
+## Process
+
+### 1. Triage (if not already done)
+
+If the issue block already has a `Triage` field (because `/triage` ran on it), use that as the diagnosis but verify it's still accurate by quickly reading the relevant code.
+
+If the issue hasn't been triaged yet:
+- Read the relevant source code and CUJs
+- **If the block has a `Screenshots` field, read each screenshot with the Read tool** for visual context before diagnosing.
+- Identify root cause, files involved, and scope — classify with `/triage`'s full scope table (all seven scopes, including spec-stale and quality)
+
+If the scope (existing or freshly derived) is anything but small or medium, **route it instead of fixing it** — you're the one the user asked, so the handoff happens here, not as a refusal: write the Triage field onto the issue block (Route included, per `/triage` Step 4) and follow `/triage` Step 5. Run-now routes (`/spec-sync`, `/design-feature`, the spec-conflict question) continue in this session; queued routes (large → `/dev-cycle`, quality → `/quality-cycle`) are recorded, and you tell the user where the item went.
+
+### 2. Plan the fix
+
+Before writing any code:
+- State what you're going to change and why
+- Identify which tests already cover this behavior (if any)
+- Identify whether a new test is needed to prevent regression
+
+### 3. Implement the fix
+
+- Make the minimal change needed to resolve the issue
+- Do not refactor surrounding code
+- Do not add features
+- Do not change interfaces or APIs unless that's the actual bug
+- Follow existing code conventions and patterns
+
+### 4. Test
+
+- Run the project's existing test suite — all tests must still pass
+- If the bug wasn't covered by an existing test, write a focused test that:
+  - Reproduces the original bug (would have failed before the fix)
+  - Verifies the correct behavior (passes after the fix)
+  - Name it clearly: reference the CUJ and the specific behavior
+- Run tests again with the new test included
+
+### 5. Verify
+
+If a dev server can be started and the fix is UI-visible or API-observable:
+- Start the dev server
+- Manually verify the fix works as expected
+- Check that adjacent functionality isn't broken
+
+**For an ENG entry, additionally execute the entry's `Verify` check exactly as written** and confirm the expected outcome. Report the command and its output to the user — that evidence is the entry's done-gate. If the check fails, the task is not done; do not proceed to commit.
+
+### 6. Spec-sync check
+
+Compare the post-fix behavior against what the spec asserts (the affected CUJ's Journey Steps, acceptance criteria, and mocks — the issue block's CUJ field tells you where to look):
+
+- **Fix restored spec compliance** (the normal case — a bug is a deviation from spec, so the fix moves behavior *toward* it): nothing to sync. Skip silently.
+- **Fix moved behavior *away* from the current spec** (a user-directed change — "make the button green" — that the PRD/mock still contradicts): run the spec-sync procedure from `/spec-sync` scoped to exactly this change. Ask the sync-or-revert question, apply the minimal amendments to the contradicted PRD lines and mock tokens, and include them in this fix's commit with the `Spec-sync:` trailer. If the amendment can't stay minimal (the change alters the journey's shape), the spec work escalates to `/design-feature` Route D — ship the fix, tell the user the spec needs a design pass.
+
+This check is mandatory — skipping it is how specs go stale and how later cycles revert intentional changes.
+
+### 7. Commit
+
+Commit with a conventional commit message:
+```
+fix: <concise description>
+
+Refs CUJ-<ID> (<prd-file>)
+<one-line explanation of root cause and what was changed>
+```
+
+For an ENG entry, reference the ENG ID instead (this is the permanent record once the block is removed):
+```
+<type>: <concise description> (ENG-NNN)
+
+<one-line explanation of what was done and the Verify outcome>
+```
+
+### 8. Clean up the issue + its attachments
+
+If the issue came from `docs/issues.md`:
+
+1. Locate the issue's h3 block in `docs/issues.md`. Note any files listed under its `Screenshots:` field.
+2. **Delete those screenshot files** from `docs/issues-attachments/`. They were transient evidence; the fix is in git, the screenshots are no longer needed.
+3. **Remove the entire h3 block** from `docs/issues.md`, including the leading `---` separator. Be careful not to remove an adjacent issue's separator.
+4. If `docs/issues.md` is now empty (just the preamble), leave the preamble in place — don't delete the file.
+
+The fix is recorded in git history — the inbox doesn't need to track resolved items, and the attachments dir stays clean.
+
+If the issue came from a direct `quick-fix "<description>"` invocation (no block in `docs/issues.md`), there's nothing to clean up — the git commit is the only record.
+
+If the work item was an ENG entry: remove its h3 block from `docs/eng-backlog.md` (including the leading `---` separator; leave the preamble and `Next-ID:` line untouched). There are no screenshots to delete.
+
+## Scope guard
+
+If at any point during the fix you realize the issue is larger than expected:
+- **You've already touched 3+ files and there's more to do**: Stop.
+- **The fix requires changing a shared interface or data model**: Stop. This needs TL review.
+- **The fix touches code a load-bearing decision owns** (`system.md` §9's Load-bearing column): Stop. tl has to reopen that decision.
+- **Fixing this bug would break other features**: Stop. This needs the full pipeline.
+
+In each case the item is now large: revert your partial edits (`git restore -- <files you touched>`), update its Triage field (scope `large`, `Route: queued → /dev-cycle`, with what you learned in `Notes`; an ad-hoc item gets a block per `/triage` Step 5) so the next `/dev-cycle` takes it, and tell the user. Do not push through a large fix just because you started — a half-fix is worse than a clean handoff.
+
+## What NOT to do
+
+- Don't attempt large fixes — route them (`queued → /dev-cycle`)
+- Don't fast-path an ENG entry that has an `Ordering` field — constrained entries go through the planner, whatever their size
+- Don't complete an ENG entry without executing its `Verify` check and reporting the evidence
+- Don't refactor or "improve" code beyond what the fix requires
+- Don't modify PRD files or design docs beyond Step 6's spec-sync amendments — in the normal case the spec isn't wrong, the code is
+- Don't skip running tests
+- Don't commit without a test that covers the bug (unless it's a purely cosmetic fix)
+- Don't skip the spec-sync check (Step 6) when a fix changes user-visible behavior away from the spec — unsynced drift is what makes later cycles revert intentional changes
+- Don't leave stale entries in docs/issues.md after fixing
+- Don't leave orphaned screenshots in docs/issues-attachments/ — Step 8 deletes them along with the issue block
+- Don't commit screenshots from docs/issues-attachments/ — the directory should already be in .gitignore (created by /report-bug); never bypass that
+
+ARGUMENTS: $ARGUMENTS

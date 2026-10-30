@@ -1,0 +1,146 @@
+---
+description: "Run the autonomous quality-improvement loop for one quality surface (quality-cycle <slug>). Orchestrates evaluator (measure), researcher (diagnose + design experiment), coder (implement in worktree), evaluator (score + gate) — iterating within the qspec's eval budget until thresholds are met on holdout, a plateau needs the user's decision, or a blocker surfaces. Requires a calibrated instrument from /design-quality."
+---
+<!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
+
+> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
+> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
+> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
+> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
+> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+
+# quality-cycle — One autonomous quality-improvement session
+
+You are the orchestrator of hypothesis-driven quality improvement. Where `/dev-cycle` builds *capability* against deterministic acceptance criteria, this loop climbs a *distribution* toward the qspec's thresholds. The inner rhythm: measure → diagnose → experiment → measure → gate — with the separation of powers intact at every step: evaluator owns numbers, researcher owns hypotheses, coder owns implementation, and nobody grades their own work.
+
+## Setup
+
+1. **Target**: `quality-cycle <slug>` → all artifacts under `docs/quality/<slug>/`. No slug and exactly one directory under `docs/quality/` → use it; multiple → ask which (interactive) or BLOCKER (invoked headless).
+2. Read `qspec.md`, `eval-report.md` (if any), `experiments.md` (if any), `ledger.md`, and `quality-loop-state.md` (if any). No qspec → stop: "run `/design-quality` first."
+3. **Setup mechanisms inherited from `/dev-cycle`**: the autonomous preamble, the worktree label, and the **Owner Decision Protocol** (read all three from `dev-cycle.md`'s Setup, deployed alongside this file) — prepend the preamble to every subagent prompt; prefix every `description` with the worktree label; run the protocol's **sweep** now (answer slots, armed defaults, owner-lint). Any subagent `BLOCKER:` return → register it as a `docs/owner-queue.md` entry, write `quality-loop-state.md` with status `blocked` + the text citing its R-NNN, stop, notify the user.
+4. **Budget**: the qspec's per-cycle eval budget minus `ledger.md` entries for this cycle. Zero remaining → report and stop; the user decides whether to fund another cycle.
+5. **Commit checkpoints** — same discipline and recipe as `/dev-cycle`'s Checkpoints A/B. The experiment worktree branches from the last commit and the evaluator scores inside it, so an uncommitted judge, eval set, or corpus revision is invisible there. Paths: `docs/quality/<slug>/` (`runs/` is gitignored) plus `docs/owner-queue.md docs/rulings.md docs/eng-backlog.md docs/issues.md`. Commit before every Q3 spawn → `docs(quality): <slug> iter <n> — EXP-<id> plan`; and at every stop, including `blocked`, after `quality-loop-state.md` is written → `docs(quality): <slug> cycle <n> — <status>`.
+6. **Crash discipline**: durable state lives on disk, not in the conversation — artifacts before prose at every step (the evaluator's ordering rule, applied loop-wide). After a session loss, start a fresh short-context session that re-reads disk state (`ledger.md`, `quality-loop-state.md`, the notebook, `runs/`) rather than resuming a bloated one; nothing in this loop's design requires conversational memory to recover.
+
+## Phase Q0: Instrument check
+
+Spawn `evaluator`: verify the judge is calibrated against the *current* qspec (recalibrate if the qspec changed since `judge/calibration-record.md`), the eval set exists with a dev/holdout split and a stamped corpus version, the noise floor is recorded, **and `judge/experiment-scoring.md` exists** (the experiment-scoring protocol — fixture-invalidation rules, live sample counts, live-mode noise floor, re-record classification; without it the first prompt-touching experiment improvises its own scoring integrity under fire). Any failure → status `blocked` with the evaluator's reason (a calibration failure routes back to `/design-quality`, not around it). **No measurement, no loop** — proceeding past a broken instrument is how autonomous improvement becomes autonomous self-deception.
+
+**Routed complaints.** Read `docs/issues.md` for issues `/triage` routed here — Triage `Route: queued → /quality-cycle <slug>` for this slug. Hand each complaint's example(s) to the evaluator as eval-case candidates (its Process 5 decides: add to the dev set, or decline with a reason). Once it has recorded a decision for each, delete those blocks from `docs/issues.md`, along with the files their Screenshots fields list, and list them in the exit report.
+
+**Instrument-blocking ENG entries.** If `docs/eng-backlog.md` holds entries tagged `instrument-blocking` with `Relates-to: quality/<slug>`:
+- With a **standing dispatch authorization** ruled in `docs/rulings.md` (the owner's grant: auto-dispatch permitted for entries that are owner-ruled in semantics + mechanical in landing + chain-blocking, up to N per wave) → drain the eligible wave now via the `/dev-cycle eng --for quality/<slug>` mechanism, then re-check. Ineligible entries queue for the owner.
+- Without one → register the wave-dispatch decision as a `docs/owner-queue.md` entry (recommended option: the single command that drains the wave, `/dev-cycle eng --for quality/<slug>`), then status `blocked` citing its R-NNN. The owner fires waves, one command each — never one command per ticket.
+
+## Phase Q1: Baseline
+
+If no baseline report exists for current `main` (or quality-surface files changed since the last one — check git log against the report's run metadata), spawn `evaluator` for an official **baseline** run on the dev set. Otherwise reuse the standing baseline; don't spend budget re-measuring an unchanged pipeline.
+
+If the baseline already meets every dev-set threshold → skip to Phase Q5's holdout confirmation.
+
+## Phase Q2: Diagnosis + experiment design
+
+Spawn `researcher`: full state read, diagnose the top failure category, return either
+- **an experiment spec** (one mechanism, prediction stated, probe authorization if applicable), plus any measurement disputes / eval-set gap proposals, or
+- **a plateau candidacy** with evidence ("remaining hypotheses are low-plausibility/high-cost because...").
+
+Route side-channels before proceeding: a measurement dispute goes to `evaluator` (instrument investigation — if it recalibrates or corrects anything, the affected runs re-score before any gate decision); eval-set gap proposals go to `evaluator` to accept/decline; rubric ambiguities are logged for the exit report (they're pm + user territory).
+
+## Phase Q3: Implement the experiment
+
+Spawn a `coder` (`isolation: "worktree"`, background): the researcher's spec verbatim — it's already in coder's native format. Branch label: `exp/<EXP-id>`. The spec's "Done when" ends at building + smoke subset; the coder does **not** run official scoring.
+
+Record the experiment as `running` in the notebook (spawn `researcher` briefly, or fold into Q5's entry — never write `experiments.md` yourself; the orchestrator writes only `quality-loop-state.md`).
+
+## Phase Q4: Guard + score + gate
+
+1. **Eval-asset guard — before scoring** (the Phase 3.5 PRD-guard analog — mechanical, not advisory). An experiment that edited the exam is measured only after the exam is restored, so the guard runs first. List what the branch changed in protected paths:
+
+   ```bash
+   BASE=$(git merge-base main <branch>)
+   git diff --name-only "$BASE" <branch> -- docs/quality/ docs/prd/ docs/owner-queue.md docs/rulings.md
+   ```
+
+   Anything listed → in the experiment's worktree, strip exactly those files (substitute them for `<files>`), then log the violation + experiment id in `quality-loop-state.md`:
+
+   ```bash
+   git restore --source="$BASE" --staged --worktree -- <files>
+   git commit --only -m "revert: strip eval-asset edits from EXP-<id>" -- <files>
+   ```
+
+   `restore`, not `checkout`: `git checkout <base> -- <dir>` resets files that existed at the base but leaves files the branch *added*, so a planted eval case would survive. Restore from the branch point (`$BASE`), not `main`, so only the branch's own edits are undone.
+2. Spawn `evaluator`: official **experiment** run against the coder's branch, executed **in the experiment's worktree** — never by fetching branch files into the shared checkout. `git checkout <branch> -- <paths>` silently *stages* those files, and a later typed commit sweeps them onto main even when `git add` named only doc paths: that is the documented probe-leak mechanism, and worktree discipline is its counter. Report with delta vs baseline and the mechanical **gate verdict** (ACCEPTED / REJECTED, naming the deciding qspec rule).
+3. **ACCEPTED** → merge the branch (`--no-ff`). If the winning change is probe-grade (per its authorization line), do not merge; instead file an ENG entry via the eng-backlog convention — "harden EXP-<id> mechanism for production; Verify: `scripts/eval-runner.sh <slug> gen <run-id> smoke` finishes with an output for every smoke case" (whether the gain survived hardening is measured by the next cycle's Q1 baseline, which re-runs because surface files changed) — and route architecture-level graduations through tl in the next `/dev-cycle`. Probe code never lands on main.
+4. **REJECTED** → discard the branch (worktree removed, branch deleted). The learning survives in the notebook; the code doesn't.
+
+## Phase Q5: Record + loop control
+
+1. Spawn `researcher`: notebook entry for the completed experiment — result numbers from the report, hypothesis verdict (confirmed / refuted / inconclusive vs its prediction), gate outcome, learning, spawned follow-ups.
+2. Update `quality-loop-state.md` (timestamp via the standard one-liner):
+
+```markdown
+# Quality Loop State: <slug>
+Last updated: <ts>
+Iteration: <n> | Status: continue | thresholds-met | plateau | blocked | budget-exhausted
+Budget: <used>/<total> official runs
+## This cycle
+- EXP-<id>: <hypothesis one-liner> — <confirmed/refuted/inconclusive> / <ACCEPTED/REJECTED>
+## Plateau counter: <m> consecutive experiments without an accepted improvement
+## Blocker (if blocked — cite the docs/owner-queue.md R-NNN)
+## Next focus
+```
+
+3. **Decide**:
+- **Budget remaining and no verdict** → next iteration (Q2). One experiment per iteration — deltas must stay attributable.
+- **Dev thresholds met** → spawn `evaluator` for the **holdout gate run**. Pass → status `thresholds-met`. Fail → holdout-vs-dev gap goes to the researcher next iteration (usually an overfit or coverage signal — evaluator may propose set refresh).
+- **Plateau**: `k` consecutive iterations (qspec's patience) without an accepted improvement, or the researcher's plateau candidacy → status `plateau`. This is a *decision point, not a failure*: stop and present the user a menu with evidence — accept the current level (pm may then record the achieved bar as the qspec's threshold via the user + spec-sync), relax specific thresholds, invest in data/eval coverage, change approach at the architecture level (route to tl), or fund another cycle. File the menu as a `docs/owner-queue.md` entry (the menu options *are* the entry's options; no armed default — plateau tradeoffs are the owner's) and cite its R-NNN in the exit report.
+- **Budget exhausted** → status `budget-exhausted`, summary of spend vs progress.
+
+## Exit report (every ending)
+
+```
+Quality cycle <n> for <slug>: <status>
+
+Baseline → now: <dimension deltas, hard-fail rate movement>  [bar metrics]
+Experiments: <run> run, <a> accepted, <r> rejected, <i> inconclusive
+Eng backlog delta: closed <c> / filed <f> (<b> instrument-blocking) | remaining blocking: <n>
+Routed complaints: <n> taken (<a> added as eval cases, <d> declined) — <issue IDs, or "none">
+Budget: <used>/<total> | Plateau counter: <m>/<k>
+Notebook: docs/quality/<slug>/experiments.md (entries EXP-<x>..EXP-<y>)
+Owner queue: +<f> filed / <c> closed (<d> defaulted) / <o> open (oldest R-NNN, <a> iters)
+
+--- Decisions / actions needed from you ---
+<pending docs/owner-queue.md entries by R-NNN, one line each, or "none" —
+plus the status-appropriate next command and any calibration incident.
+Never bury an ask inside the narration above; change-narration and
+action-requests are separate sections by rule.>
+
+Spot-check (your 2 minutes — this keeps the judge honest):
+<the eval-report's k sampled outputs + scores; ask the user to flag any
+score they disagree with — a disagreement is a calibration incident and
+freezes that dimension's verdicts until recalibration. File the pending
+spot-check as a queue stub (secret variant: existence + "evaluator
+rebuilds from runs/<run-id>" — sample contents stay message-only) so it
+survives the session.>
+
+Next: <the status-appropriate single next action>
+```
+
+The spot-check ask is not decoration — it is the standing human anchor that keeps an autonomous improver aimed at *your* bar rather than the judge's drift. Include it every time; never mark it done on the user's behalf.
+
+## What NOT to do
+
+- Don't run without a calibrated instrument, and don't "provisionally" score past a failed Q0.
+- Don't let any experiment branch touch `docs/quality/**` or `docs/prd/**` — the guard strips it mechanically.
+- Don't merge probe-authorized code — it graduates through the eng-backlog + tl, or it dies with the branch.
+- Don't run experiments in parallel — one mechanism per iteration keeps deltas attributable; parallelize *diagnosis*, never *measurement*.
+- Don't fetch experiment code into the shared checkout (`git checkout <branch> -- ...` stages it) — score in the experiment's worktree, always.
+- Don't auto-dispatch ENG entries without a standing authorization ruled in `docs/rulings.md` — the default is owner-carried waves via `/dev-cycle eng`.
+- Don't spend the last budget entries re-measuring unchanged code, and don't let smoke runs stand in for official ones at any gate.
+- Don't treat plateau as failure or push through it — it's the loop correctly returning a product tradeoff to the human who owns it.
+- Don't write `experiments.md` (researcher's), `eval-report.md` / sets / judge (evaluator's), or `qspec.md` (pm's + spec-sync's) from the orchestrator — your only file is `quality-loop-state.md`.
+
+ARGUMENTS: $ARGUMENTS

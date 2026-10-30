@@ -32,10 +32,11 @@ Read `docs/prd/index.md`, all files under `docs/design/`, and `docs/eng-backlog.
 
 **Checkpoint ladder and the `--until` flag.** The owner supervises the build at the rungs of the checkpoint ladder — `system.md`'s **Build Order & Checkpoints** table, authored by tl (rung kinds, format, and authoring rules live in tl's role definition). Read it if it exists, together with `docs/loop-state.md`'s Checkpoints section (which rungs are reached). Derive:
 - **Active rung** — the lowest unreached rung; in scoped mode, the lowest unreached rung whose Scope touches the target PRD. No ladder yet → this cycle writes one (Phase 1) and reviews it (Phase 1.5).
-- **Plan review due** — when `CHANGED_PRDS` is non-empty, or any active PRD has CUJs not covered by an approved ladder (`Approval: pending`, or a project that predates the ladder). The review runs once per PRD change, not every cycle.
-- **Run-through** — rung pauses are skipped when, in this precedence: the invocation says `--until done` (run to `done`/`blocked`) or `--until <Cn>` (pass every rung before `Cn` silently, pause at `Cn`); else a standing ruling in `docs/rulings.md` with `Scope: prd-NNN` says no checkpoint pauses for the PRD the active rung belongs to. The flag beats the ruling in both directions — `--until C3` pauses at C3 even under a no-pauses ruling, because the invocation is the owner's most recent intent. Run-through also skips Phase 1.5: an unapproved ladder stays `pending` and is presented at the next cycle invoked without `--until`. Eng-wave cycles have no rungs and never pause.
+- **Plan review due** — when `CHANGED_PRDS` is non-empty, or any active PRD has CUJs not covered by an approved ladder (`Approval: pending`, or a project that predates the ladder). The review runs once per PRD change, not every cycle. It also runs when tl reports load-bearing decisions new, changed, or reopened.
+- **Deferred bugs** — MEDIUM bugs in `docs/qa-report.md` whose file matches a load-bearing decision's owned paths (`system.md` §9) while its validation rung is neither reached nor active. They count as LOW and the planner leaves them unscheduled, so one scenario's quirks aren't polished before the decision meets varied real data; once that rung is active, they are its work. HIGH and CRITICAL bugs are never deferred.
+- **Run-through** — rung pauses are skipped when, in this precedence: the invocation says `--until done` (run to `done`/`blocked`) or `--until <Cn>` (pass every rung before `Cn` silently, pause at `Cn`); else a standing ruling in `docs/rulings.md` with `Scope: prd-NNN` says no checkpoint pauses for the PRD the active rung belongs to. The flag beats the ruling in both directions — `--until C3` pauses at C3 even under a no-pauses ruling, because the invocation is the owner's most recent intent. Run-through also skips Phase 1.5 — an unapproved ladder stays `pending` and is presented at the next cycle invoked without `--until` — except when load-bearing decisions are new, changed, or reopened. Eng-wave cycles have no rungs and never pause.
 
-Run-through never skips `blocked` and never skips a rung's Verify: a passed-through rung is still verified and recorded as reached, so `status.md` shows when it was crossed.
+Run-through never skips `blocked` or a sample request, and never skips a rung's Verify: a passed-through rung is still verified and recorded as reached, so `status.md` shows when it was crossed.
 
 ### Guidelines Discovery
 
@@ -217,8 +218,9 @@ entry needs a concrete, executable Verify check.
 
 THIRD — checkpoint ladder (Checkpoint ladder, Section 5 of your role
 definition): [no ladder exists → "Write system.md's Build Order &
-Checkpoints for the active PRDs. Where work is already in place, cover
-the remaining work and note in one line what exists." | CHANGED_PRDS
+Checkpoints for the active PRDs. Where work is already in place, list
+the load-bearing decisions already built and put their validation rungs
+first, then cover the remaining work." | CHANGED_PRDS
 non-empty → "Append or adjust rungs for the changed PRDs: <list>; set
 Approval back to pending and list the diff against the approved
 version in your summary." | otherwise → "The ladder is approved
@@ -229,6 +231,13 @@ Also review the design implications of these defects triage routed
 to this loop (each needs the full pipeline): [embed each routed
 issue's ID, headline, CUJ, root cause, files, and Notes — or 'none'].
 
+FOURTH — load-bearing decisions (Section 5 of your role definition):
+mark new ones (none marked yet → the ones already built), revise
+changed ones, and reopen any whose owned paths hold a routed defect's
+root cause. [active rung proves a D-n → "The active rung proves D-n:
+design its fixes by mechanism, from its failing samples and these
+deferred bugs: <list>."]
+
 Return a summary of:
 1. What design decisions were made or updated
 2. What ENG entries you filed (IDs), if any
@@ -236,7 +245,9 @@ Return a summary of:
 4. Any blockers that require user input before work can proceed
 5. Requirement challenges filed (R-NNN), if any
 6. The checkpoint ladder: new | changed (with the diff against the
-   approved version) | unchanged"
+   approved version) | unchanged
+7. Load-bearing decisions: new | changed | reopened (D-IDs, each with
+   what changed and what built work it touches) | unchanged"
 ```
 
 If tl reports a **blocker requiring user input**, stop the loop, update `docs/loop-state.md` with status `blocked`, and notify the user with the blocker details.
@@ -245,13 +256,15 @@ If tl reports a **blocker requiring user input**, stop the loop, update `docs/lo
 
 ## Phase 1.5: Checkpoint Plan Review
 
-Runs only when Setup found the plan review **due** and the cycle is **not** in run-through mode. This is where the owner sees, in one place, where the loop will pause for them — and approves or reshapes it before the planner writes a single task.
+Runs when Setup found the plan review **due** and the cycle is **not** in run-through mode — and in every mode when tl reports load-bearing decisions new, changed, or reopened. This is where the owner sees, in one place, where the loop will pause for them — and approves or reshapes it before the planner writes a single task.
 
-1. **Register first.** Per the Owner Decision Protocol, append a `docs/owner-queue.md` entry — headline `Approve the checkpoint plan for <prd list>?`; options exactly: **A. Approve** *(recommended)* — the cycle continues into planning; **B. Change** — say what to merge, split, add, drop, or reorder; **C. No pauses for this PRD** — build end to end, keep the ladder as a progress map. *No default — this waits for you.* (A new ladder is a decision with options that nothing lower decides; a changed ladder re-enters the same way, with the diff in its context lines.)
+1. **Register first.** Per the Owner Decision Protocol, append a `docs/owner-queue.md` entry — headline `Approve the checkpoint plan for <prd list>?` (`Approve D-n, … and the checkpoint plan?` when load-bearing decisions are up for review); options exactly: **A. Approve** *(recommended)* — the cycle continues into planning; **B. Change** — say what to merge, split, add, drop, or reorder; **C. No pauses for this PRD** — build end to end, keep the ladder as a progress map. *No default — this waits for you.* (A new ladder is a decision with options that nothing lower decides; a changed ladder re-enters the same way, with the diff in its context lines.)
 
 2. **Present the plan in the session**, in the project's working language, derived from `system.md` — never a second copy with different content:
 
    > **Checkpoint plan for <prd-NNN-slug>.** Architecture review is done. No code has been written. These are the points where the loop will pause for you. Each pause ends when you say `continue` or run `/loop /dev-cycle`.
+   >
+   > <for each new, changed, or reopened load-bearing decision, a brief built from system.md: **D-n — <decision>** · what it is, in the product's terms · considerations (its Why and Rejected) · unsure of (§11 risks citing it) · what rests on it, and for a change to built work, what has to change, including stored data to migrate · how it will be proven (its validation rung's samples)>
    >
    > <the ladder table from system.md — columns: #, Checkpoint, Kind, What you can do at the pause (its Poke), What the loop verifies first (its Verify)>
    >
@@ -263,7 +276,7 @@ Runs only when Setup found the plan review **due** and the cycle is **not** in r
 
 3. **Ask** with `AskUserQuestion` (options A/B/C; the owner can always type free text).
    - **A** → transcribe; mark `C1` reached in the loop-state Checkpoints section; close the entry as a durable ruling (`docs/rulings.md`, `Scope: prd-NNN`, Ruling: "checkpoint ladder approved as of <commit>"); write `Approval: R-NNN (<date>)` on the ladder in `system.md`. Continue to Phase 2 **in this same run**.
-   - **B** → take the owner's words, spawn `tl` to amend the ladder accordingly, then re-present from step 2. Iterate until A or C.
+   - **B** → take the owner's words, spawn `tl` to amend the design or ladder accordingly, then re-present from step 2. Iterate until A or C.
    - **C** → close as a durable ruling (`Scope: prd-NNN`, Ruling: "no checkpoint pauses; the ladder is a progress map"); write `Approval: run-through R-NNN` in `system.md`; continue to Phase 2 in run-through mode.
    - **Declined or unanswered** (nobody is there) → the entry stays open. Write `docs/loop-state.md` with status `checkpoint` and `Pause: plan-review (R-NNN)`, run Checkpoint B, and stop with the plan as the exit report. The next cycle's Setup sweep finds the answer — written under "your answer" or said in chat — and resumes from the matching branch above.
 
@@ -273,14 +286,16 @@ A ladder tl changed in a later cycle (its Phase 1 return says "changed") re-runs
 
 ## Phase 2: Task Planning
 
+**Sample request first.** If the active rung's Poke says `you supply:` and the sample path its Verify names is missing or empty, don't plan: set status `checkpoint` with `Pause: samples Cn`, run Checkpoint B, and stop with the sample request (Exit Conditions). Run-through does not skip this.
+
 Spawn a `planner` subagent:
 
 ```
 Prompt: "Based on the current project state, update docs/tasks.md with
 the next round of tasks. Read docs/prd/index.md and active PRDs under
 docs/prd/, all files under docs/design/, docs/status.md, docs/qa-report.md
-(if it exists — every MEDIUM-or-higher bug must become a fix task with
-priority above new feature work), and docs/eng-backlog.md (if it exists —
+(if it exists — every MEDIUM-or-higher bug except the deferred ones
+below must become a fix task with priority above new feature work), and docs/eng-backlog.md (if it exists —
 open engineering tasks). Prioritize in this order:
 1. Fix MEDIUM-or-higher bugs from docs/qa-report.md (any kind — BUG,
    REGRESSION, FABRICATION, FLAKY, VISUAL_DEVIATION), and the routed
@@ -300,6 +315,9 @@ carry its Issue ID in the title.
 Routed defects (confirmed by triage; they need the full pipeline):
 [embed each routed issue's ID, headline, CUJ, root cause, files, and
 Notes — or 'none'].
+
+Deferred bugs (count as LOW; a later validation rung's work — do not
+schedule): [list, or 'none'].
 
 Checkpoint ladder: the active rung is [Cn — title; Kind: seam | journey;
 Scope: <...> — or 'no ladder']. Plan only the work needed to reach it
@@ -443,7 +461,7 @@ they are the rung's gate."
 
 ### After QA completes:
 
-Read `docs/qa-report.md` and check the overall verdict plus bug severities. The verdict alone doesn't decide the loop — combine it with the severity distribution. `UNIMPLEMENTED` CUJs never affect this phase: they're unfinished work for later iterations, not failures of this one.
+Read `docs/qa-report.md` and check the overall verdict plus bug severities; deferred bugs (Setup) count as LOW throughout this phase. The verdict alone doesn't decide the loop — combine it with the severity distribution. `UNIMPLEMENTED` CUJs never affect this phase: they're unfinished work for later iterations, not failures of this one.
 
 First, **incomplete verification** — the verdict line names CUJs QA couldn't fully walk even after re-walking. Unless MEDIUM+ bugs already send the loop back (that retry re-verifies everything), re-spawn `qa` once for just those CUJs; it counts toward the 2-retry budget. Still incomplete → mark status `blocked` with QA's reason and stop. Never send coders to fix a CUJ with no known bug. Then apply:
 
@@ -522,7 +540,7 @@ If a prior phase already set status to `blocked` or `checkpoint` (Mocks Check pa
 This two-key gate ensures engineering correctness (QA) and product intent (PM) both sign off before the loop terminates. QA can pass a CUJ that meets every literal acceptance criterion while PM correctly judges it `Caveats` because the impl misses the point of the feature — that's a `continue` signal, not a `done`.
 
 **Checkpoint rungs** (when a ladder exists). Before settling on `done`/`continue`, decide whether the **active rung** is reached:
-- **seam** — tl's Phase 3.6 summary says `Checkpoint Cn Verify: PASS`, and QA's verdict is `PASS` or `FAIL` with LOW-only bugs.
+- **seam** — tl's Phase 3.6 summary says `Checkpoint Cn Verify: PASS`, and QA's verdict is `PASS` or `FAIL` with LOW-only bugs (deferred bugs count as LOW).
 - **journey** — every CUJ in the rung's Scope has QA `PASS` and PM `Satisfied` (the `done` gate, scoped to the rung).
 
 Not reached → `continue` (the next planner keeps the same active rung). Reached → record it in the loop-state Checkpoints section (`Cn reached — iter N, <timestamp>`), then:
@@ -530,7 +548,7 @@ Not reached → `continue` (the next planner keeps the same active rung). Reache
 - a later rung exists and run-through does **not** cover this rung (no `--until` naming a later rung or `done`, no no-pauses ruling for its PRD) → status **`checkpoint`**, `Pause: Cn`;
 - otherwise → mark it `reached (passed through)` and status `continue`.
 
-A rung pause is not an owner-queue entry — its only answer is running the loop again. The plan review in Phase 1.5 is the one queue-bearing pause.
+A rung pause or a sample request is not an owner-queue entry — its only answer is running the loop again (after supplying the samples). The plan review in Phase 1.5 is the one queue-bearing pause.
 
 **Close routed issues** whose fix is confirmed — its task merged and `docs/qa-report.md` shows the issue's CUJ `PASS` (CUJ `unknown` → merged and QA reports no related bug). Delete each closed block from `docs/issues.md`, along with the files its Screenshots field lists. Unconfirmed ones stay open for the next cycle.
 
@@ -564,7 +582,7 @@ Status: <continue | done | blocked | checkpoint>
 - Ladder approval: pending | R-NNN | run-through R-NNN
 - Reached: C1 (iter 1, <timestamp>), C2 (iter 2, <timestamp>, passed through), ...
 - Active rung: <Cn — title> (seam | journey)
-- Pause: none | plan-review (R-NNN) | Cn        ← set when status = checkpoint
+- Pause: none | plan-review (R-NNN) | Cn | samples Cn   ← set when status = checkpoint
 - Run-through: none | --until done | --until Cn | ruling R-NNN
 
 ## Blocker (if status = blocked)
@@ -601,6 +619,7 @@ Every stop runs Checkpoint B before its report — including early `blocked` sto
 - **Status = `blocked`**: Report the blocker clearly to the user. Stop the loop and wait for their input.
 - **Status = `checkpoint`**: Stop the loop — the owner asked to look here. Report per the pause kind:
   - **plan-review**: the plan presentation from Phase 1.5 (the ladder table, why this cut, the R-NNN and its options).
+  - **samples `Cn`**: the sample request, in tl's voice — the decision the rung proves and what tl is unsure of (its §11 risks); each sample to supply with its expected outcome, verbatim from the Poke; where they go (the path its Verify names). Then: *Supply them, then reply `continue`.*
   - **rung `Cn`**: a try-it card — what exists now (the rung's title and Scope); how to start it (the project's canonical start command, e.g. `./scripts/qa-server.sh start`, and the entry URL); the rung's Poke actions verbatim; test counts and tl's Verify evidence; for a journey rung, the CUJ list with mock paths, QA's walk-screenshot paths, and PM's per-CUJ verdicts; and the next rung's title. Then the fixed closing line: *Reply `continue` to run to the next pause (`/loop /dev-cycle`), or `/dev-cycle` for a single iteration. Spec change → `/design-feature` (Route D). Defect → `/report-bug`. Design change → tell tl or edit `docs/design/`, then continue.*
 - **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, routed issues taken / closed, what remains). The loop continues to the next iteration.
 

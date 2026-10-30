@@ -79,7 +79,7 @@ If the user provided a specific goal, use that. Otherwise, derive **remaining CU
 
 Then prioritize across all three work sources (bugs, engineering tasks, CUJs) using this ladder:
 
-1. **MEDIUM-or-higher bugs from `docs/qa-report.md`** — the loop invariant; never schedule new work above unresolved MEDIUM+ bugs.
+1. **MEDIUM-or-higher bugs from `docs/qa-report.md`** — the loop invariant; never schedule new work above unresolved MEDIUM+ bugs. Deferred bugs named in your prompt are the exception: they are a later validation rung's work, so leave them unscheduled.
 2. **`blocking` entries from `docs/eng-backlog.md`** — a deploy/release-blocker makes everything else undeliverable; it outranks feature work.
 3. **Unfinished CUJs and `P1` ENG entries, interleaved** — sequenced by pm-review priorities, hard dependencies, and ENG `Ordering` constraints.
 4. **LOW bugs and `P2` ENG entries** — as capacity allows.

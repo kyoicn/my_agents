@@ -67,7 +67,7 @@ Classify as one of seven scopes:
 |-------|----------|-----------------|
 | **small** | 1-3 files, no design change, clear spec deviation, isolated fix | `/quick-fix` — run now |
 | **medium** | Multiple files but no design change, may need QA verification | `/quick-fix` — run now (the next `/dev-cycle`'s QA walk re-verifies) |
-| **large** | Cross-component, design implications, needs architectural review | `queued → /dev-cycle` — its next run takes it |
+| **large** | Cross-component, design implications, needs architectural review — or the root cause lies in code a load-bearing decision owns (`system.md` §9's Load-bearing column): Notes name the D-ID, and tl reopens it | `queued → /dev-cycle` — its next run takes it |
 | **spec-gap** | Behavior not defined in any PRD, needs product design before code | `/design-feature` — run now (Route C extend or Route D refine — let its orchestrator decide) |
 | **spec-conflict** | Report contradicts the PRD spec — user must decide which is correct | ask the user now → spec wrong: `/design-feature` Route D; report wrong: close as invalid |
 | **spec-stale** | Implementation deviates from the PRD *deliberately* — git history shows a user-directed change (e.g. a `fix:` commit from a /quick-fix or ad-hoc session) newer than the spec text. The code is right; the doc is stale. | `/spec-sync` — run now (docs-only — amend the contradicted PRD lines/mocks; no code change) |

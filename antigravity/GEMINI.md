@@ -58,6 +58,8 @@
 - The loop pauses at the checkpoint rungs you approved (tl's ladder in
   docs/design/system.md): look, poke, redirect, then `continue`. A pause is not
   a blocker — nothing waits in the queue except the plan review itself.
+  Run-through skips those pauses, but never the stops where tl needs your
+  judgment on a load-bearing decision or real samples to prove one.
 - Anything waiting on your decision lives in docs/owner-queue.md — oldest on
   top; answer inline under the entry or just say it in chat (agents transcribe
   before acting). Standing rulings accumulate in docs/rulings.md; agents cite

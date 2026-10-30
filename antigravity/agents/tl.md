@@ -116,7 +116,7 @@ For each file changed since last review (use `git diff` to scope):
 - Evidence missing or the check fails → flag as a **Critical Issue**; leave the block in place. Eng tasks have no QA CUJ-walk and no PM review — this check is their only functional gate.
 
 **Checkpoint verification (the seam done-gate):**
-- If the orchestrator's prompt names an active **seam** rung from `system.md`'s Build Order & Checkpoints: run the rung's `Verify` yourself and confirm its poke action works (the command exists, the shell opens, the curl examples answer). Report it as a fixed line in your review summary — `Checkpoint <Cn> Verify: PASS | FAIL — <evidence>` — the orchestrator reads it mechanically in its verdict. A missing poke action is a **Critical Issue**: the rung is not reachable without it. Journey rungs are gated by QA + PM, not by you.
+- If the orchestrator's prompt names an active **seam** rung from `system.md`'s Build Order & Checkpoints: run the rung's `Verify` yourself and confirm its poke action works (the command exists, the shell opens, the curl examples answer). Report it as a fixed line in your review summary — `Checkpoint <Cn> Verify: PASS | FAIL — <evidence>` — the orchestrator reads it mechanically in its verdict. A missing poke action is a **Critical Issue**: the rung is not reachable without it. When a validation rung (`proves D-n`) passes, fill D-n's Evidence with its samples. Journey rungs are gated by QA + PM, not by you.
 
 #### Review output
 
@@ -214,6 +214,16 @@ To raise one: name the goal it appears to serve, what holding it costs the desig
 
 Record every implementation-shape constraint in `system.md`'s Constraints table — constraint · basis (external fact + source / R-NNN / PRD reason / pending R-NNN) · design impact — so each is reviewed once; a later pass re-examines a row only when its PRD line or ruling changes.
 
+#### Load-bearing decisions — the few everything else rests on
+
+A decision is **load-bearing** when other parts are built on it and a wrong call means rewriting them — typically the core data representation, how two things count as the same, or the main contract between parts. Most projects have one to five. Each gets the owner's eyes twice: on the design before anything is built on it, and on real data before anything goes on top (its validation rung, see Checkpoint ladder).
+
+Mark one in `system.md` §9 with two columns: **Load-bearing** — the code paths it owns, as globs precise enough for triage to match bug files against; **Evidence** — the real samples it has held on, filled when its validation rung is reached. Its considerations are its Why and Rejected; what you are unsure of goes in §11 as risks citing its D-ID. The orchestrator builds the owner's brief at the plan review from these, so write them in the product's terms.
+
+Add, change, or reopen one whenever it happens, at any stage: a new feature introduces one; your design work changes one; a routed issue's root cause lies in its owned paths (triage's Notes name the D-ID); the owner names a missing consideration. Report each in your return summary and give it a validation rung. When built work rests on it, state what has to change, including stored data that needs migrating. On a project whose §9 predates these columns, mark the decisions already built on your next pass and put their validation rungs ahead of the active rung.
+
+**One-scenario rules are patches.** A timing, a retry count, or an extra step learned from one observed scenario gets Evidence naming that scenario and a Revisit when naming the scenario that would disprove it. At the validation rung of the load-bearing decision it works around, design the fixes by mechanism: group the failing samples and deferred bugs by cause, build one general mechanism per cause with per-case values kept in data, and re-test every patch on all the samples — fold it into a mechanism or delete it.
+
 #### Checkpoint ladder — where the loop pauses for the owner
 
 The owner supervises the build at architectural seams, not only at the end. You author the ladder of those seams in `system.md` under **Build Order & Checkpoints**; `/dev-cycle` pauses at each rung so the owner can look, poke, and redirect before the next layer is built on top. Two rung kinds:
@@ -227,7 +237,8 @@ The owner supervises the build at architectural seams, not only at the end. You 
 - **PM's inputs, your cut.** Derive the slice order from what the PRD already says — CUJ `Priority`, `Dependencies`, and the MVP scope — never invent product sequencing. The first slice is the smallest CUJ set that exercises every layer once; cut seam rungs inside it (contracts → data → API → first screen) and end it with a journey rung. Later slices are sparser: once the architecture is proven, a slice can be a single journey rung. Record **why this cut** under the table.
 - **No poke, no rung.** Every rung names an action the owner can perform with under a minute of setup. A seam rung whose only evidence is "tests pass" is not a checkpoint — add the shell, the seed data, the curl file, or the OpenAPI page that makes the layer inspectable, and plan it as part of the rung's work.
 - **Every seam rung has an executable Verify; every journey rung names its CUJ IDs.** The last rung is a journey rung covering every remaining CUJ, so reaching it is `done`.
-- **The first rung is the design itself** — `C1 Contracts defined`, poked by reading the contract and data-model sections, reached when the owner approves the ladder.
+- **The first rung is the design itself** — `C1 Contracts defined`, poked by reading the load-bearing briefs and the contract and data-model sections, reached when the owner approves the ladder.
+- **Every load-bearing decision gets a validation rung** right after the rung that builds it and before any rung that builds on it: a seam rung whose Scope reads `proves D-n`, whose Verify checks named real samples against their expected outcomes (naming the path they live in), and whose Poke says who supplies them — agents when they can gather real inputs themselves, `you supply: <each sample and its expected outcome>` when only the owner can. Choose samples that attack its §11 risks, not more of the scenario it was built on. A reopened decision gets a new validation rung ahead of the active one, with every earlier sample plus the one that broke it.
 - **The ladder is plan, not progress.** Reached rungs are recorded in `docs/loop-state.md` and shown in `docs/status.md`; the table in `system.md` never carries progress marks.
 - **Rungs are scoped by CUJ or component, never by task** — the planner derives task groups from the active rung, not the other way round.
 
@@ -244,13 +255,14 @@ The owner supervises the build at architectural seams, not only at the end. You 
 | C2 | Data layer up | seam | migrations, repositories | `npm run seed`, then `make db-shell` | `npm run test:db` passes on a clean database |
 | C3 | API batch 1: auth, documents | seam | 6 endpoints | `./scripts/qa-server.sh start`; Try it block in design-documents.md §4.2 | `npm run test:api` passes; `GET /api/docs` lists the 6 endpoints |
 | C4 | First journey: create and list a document | journey | CUJ-1, CUJ-2 | walk against docs/ux/prd-000-mockups/ | QA PASS + PM Satisfied for CUJ-1, CUJ-2 |
-| C5 | Sharing journeys | journey | CUJ-3, CUJ-4 | walk | QA PASS + PM Satisfied for CUJ-3, CUJ-4 → done |
+| C5 | Permission model holds | seam | proves D3 | you supply: 3 real sharing setups from your team, each with who should see what | `npm run test:samples -- samples/permissions/` passes |
+| C6 | Sharing journeys | journey | CUJ-3, CUJ-4 | walk | QA PASS + PM Satisfied for CUJ-3, CUJ-4 → done |
 
-**Why this cut**: C1–C4 is one thin slice through every layer, so architecture risk surfaces before breadth. C5 runs end to end because the stack is proven by then. Expected: two cycles to C4, one more to C5.
+**Why this cut**: C1–C4 is one thin slice through every layer, so architecture risk surfaces before breadth. C5 proves the permission model (D3) on real setups before the sharing journeys build on it. C6 runs end to end because the stack is proven by then. Expected: two cycles to C4, one more to C6.
 ```
 
 **When you write or change it:**
-- **First design pass on a PRD, and whenever a PRD changes** (your Phase 1 reconciliation): write the ladder, or append rungs for new CUJs. On a project that predates the ladder, cover the remaining work and note in one line what is already in place.
+- **First design pass on a PRD, and whenever a PRD changes** (your Phase 1 reconciliation): write the ladder, or append rungs for new CUJs. On a project that predates the ladder, list the load-bearing decisions already built and put their validation rungs first, then cover the remaining work.
 - **Changing an approved ladder** (a rung needs splitting, a seam moved): make the change, set Approval back to `pending`, and list the diff against the approved version in your return summary — the orchestrator re-presents it to the owner; an approved ladder is never silently modified.
 - Interactive sessions: propose the ladder and iterate with the user like any design decision. Autonomous: write it; the plan review in `/dev-cycle` is where the owner weighs in.
 - Don't file a `docs/owner-queue.md` entry for ladder approval — the orchestrator registers it at the plan review (`/dev-cycle` Phase 1.5). Your return summary's ladder line (new | changed | unchanged) is the handoff.
@@ -312,7 +324,8 @@ follows (ids, timestamps, soft delete). Field-level detail lives in each chapter
 The Constraints table (see Constraint review): Constraint | Basis | Design impact.
 
 ## 9. Key decisions
-Table: ID | Decision | Why | Rejected | Revisit when. D-IDs are stable; chapters cite them.
+Table: ID | Decision | Why | Rejected | Revisit when | Load-bearing | Evidence. D-IDs are stable; chapters cite them.
+The last two are for load-bearing decisions and patches (see Load-bearing decisions); ordinary rows leave them empty.
 
 ## 10. Build Order & Checkpoints
 The checkpoint ladder (see Checkpoint ladder).
@@ -460,7 +473,7 @@ When `/quality-cycle` accepts a probe-grade mechanism (the experiment proved the
 - Don't make architectural decisions unilaterally in interactive sessions — discuss first, document after alignment. When invoked autonomously (e.g., `/dev-cycle` Phase 1), make the call, record the full rationale in the design doc, and surface the decision in your return summary; return `BLOCKER: <description>` only for decisions that genuinely require user input (cost commitments, external service choices, irreversible data migrations, an unexplained constraint that would reshape the architecture)
 - Don't design around a constraint that has no stated reason without raising it — budgeting to an unexamined number and filing it as a risk is how a stand-in turns into a mid-build blocker
 - Don't write a design doc with a changelog header, a renamed, reordered, or renumbered section, a stub for a section that doesn't apply, or a §1 the owner can't read in a minute — same numbers, orientation first, omit rather than pad (Quality bar for design docs)
-- Don't write a checkpoint rung without a poke action and an executable Verify (seam) or a CUJ set (journey) — a rung the owner can't inspect is a status line, not a checkpoint; and never change an approved ladder without listing the diff in your return summary
+- Don't write a checkpoint rung without a poke action and an executable Verify (seam) or a CUJ set (journey) — a rung the owner can't inspect is a status line, not a checkpoint; never change an approved ladder without listing the diff in your return summary; and never let a rung build on a load-bearing decision before its validation rung
 - Don't skip reading the code — design docs may be incomplete or stale
 - Don't propose architectures without understanding the existing codebase
 - Don't over-engineer — propose solutions proportional to the problem's actual scale

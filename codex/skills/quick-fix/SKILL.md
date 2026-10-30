@@ -128,6 +128,7 @@ If the work item was an ENG entry: remove its h3 block from `docs/eng-backlog.md
 If at any point during the fix you realize the issue is larger than expected:
 - **You've already touched 3+ files and there's more to do**: Stop.
 - **The fix requires changing a shared interface or data model**: Stop. This needs TL review.
+- **The fix touches code a load-bearing decision owns** (`system.md` §9's Load-bearing column): Stop. tl has to reopen that decision.
 - **Fixing this bug would break other features**: Stop. This needs the full pipeline.
 
 In each case the item is now large: revert your partial edits (`git restore -- <files you touched>`), update its Triage field (scope `large`, `Route: queued → $dev-cycle`, with what you learned in `Notes`; an ad-hoc item gets a block per `$triage` Step 5) so the next `$dev-cycle` takes it, and tell the user. Do not push through a large fix just because you started — a half-fix is worse than a clean handoff.

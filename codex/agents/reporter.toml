@@ -91,6 +91,8 @@ A CUJ is **fully done** when Impl=`merged`, QA=`PASS`, AND PM=`Satisfied`. Any o
 
 `State` values: `reached (iter N)` | `reached (iter N, passed through)` | `current` (append `— paused here, awaiting your look` when loop-state status is `checkpoint`) | `pending`. The last column is the rung's Poke, copied from the ladder. The table in `system.md` is the plan; this one is the progress view.
 
+Below the table, one line per load-bearing decision (`system.md` §9 rows with the Load-bearing column filled): `D-n <decision> — proven on <its Evidence>` | `awaiting proof at Cn` | `reopened, re-proving at Cn` (Evidence filled, and an unreached rung proves it again).
+
 ## Key Types & Interfaces
 Document the core data types that flow through the system (keep it concise — type name, key fields, purpose).
 

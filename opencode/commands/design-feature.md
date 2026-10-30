@@ -3,14 +3,13 @@ description: "Design a product feature — drive a conversational product-design
 ---
 <!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
 
-> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
-> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
-> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
-> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
-> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
-> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
-> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
-> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+> **OpenCode runtime notes** — this text was written for Claude Code and adapted for OpenCode; read what remains as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`, and `/loop` is the `loop` command. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments.
+> - "Spawn a `<role>` subagent" → the `subagent` tool with `agent: "<role>"`, a short `description`, and the full prompt; `background: true` when several run at once. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary.
+> - "Spawn all in a single message" → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - Worktrees: OpenCode subagents share your checkout. "Own worktree `.worktrees/<branch>`" means you create it with `git worktree add .worktrees/<branch> -b <branch> HEAD` before the spawn and tell the subagent to work and commit only there; the `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `question` is OpenCode's question tool. A role whose permissions deny it never asks: it returns `BLOCKER:` or files an owner-queue entry, as its text says.
+> - Claude tool names left in prose (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. MCP tools are named `<server>_<tool>`; Playwright's are `playwright_browser_*`, exposed as direct tools because `~/.config/opencode/opencode.json` runs the server with `"codemode": false`.
 
 # design-feature — Design a product feature
 
@@ -25,7 +24,7 @@ The skill handles four routes — the orchestrator decides which during Phase 0:
 
 The flow:
 
-- **Phase 0** — Discovery: free-form conversational product design + explicit routing decision (no `AskUserQuestion`, no subagents). Probe problem/user, value, journeys, scope, form factor, edge cases. React to answers, mirror back, surface tensions. End by proposing a route (A/B/C/D) and getting user confirmation.
+- **Phase 0** — Discovery: free-form conversational product design + explicit routing decision (no `question`, no subagents). Probe problem/user, value, journeys, scope, form factor, edge cases. React to answers, mirror back, surface tensions. End by proposing a route (A/B/C/D) and getting user confirmation.
 - **Phase 0.5** — Shape + mocks: per CUJ, propose the shape, agree on it, draw the first mock and iterate visual + shape together, propose additional variants and draw each. The orchestrator (acting as pm) follows the mock-generation rules in `pm.md`. Mocks are real HTML files saved under `docs/ux/<prd-dir>/` and the file path is included in every response for the user to `open`.
 - **Phase 1** — PM subagent executes the route: bootstrap / write / extend / refine PRD files, referencing the mocks that already exist from Phase 0.5. No re-discovery, no mock generation here (already done).
 - **Phase 2** — Status update: append new CUJ rows (A, B, C) or reset affected rows' Impl/QA/PM columns (D). Then commit the design.
@@ -41,7 +40,7 @@ Read `docs/prd/index.md` (if it exists) and skim every active PRD's overview + C
 
 If the user invoked `/design-feature <freeform pitch>`, treat that as the opening seed. Otherwise, open with: "What are you trying to design? Give me a paragraph or two — I'll ask follow-ups."
 
-**No `AskUserQuestion` tool calls during discovery.** That tool is for structured menu choices. Discovery is free-form text — you write your questions as natural prose, the user replies in natural prose, you respond. The back-and-forth is what makes the design real.
+**No `question` tool calls during discovery.** That tool is for structured menu choices. Discovery is free-form text — you write your questions as natural prose, the user replies in natural prose, you respond. The back-and-forth is what makes the design real.
 
 ### Step 0b — Make a routing call early
 
@@ -384,7 +383,7 @@ Substitute every `<placeholder>` with the actual content from PM's return + the 
 ## What NOT to do
 
 - **Don't rush Phase 0.** Discovery in the main thread exists so you can have a real, multi-turn product design conversation. If you ask 2 questions and start drafting CUJs, you've failed the user. Stay in discovery until you can describe the user, problem, value prop, scope, and journey set *in your own words* — not just parrot back what the user said.
-- **Don't use `AskUserQuestion` during Phase 0 discovery.** Free-form text dialogue is the whole point. `AskUserQuestion` is fine for menu choices elsewhere; it's the wrong tool for design conversation.
+- **Don't use `question` during Phase 0 discovery.** Free-form text dialogue is the whole point. `question` is fine for menu choices elsewhere; it's the wrong tool for design conversation.
 - **Don't draft CUJ shapes or mocks in Phase 0.** Build the picture first. Phase 0.5 is where shapes AND mocks land.
 - **Don't skip Phase 0.5's mock iteration.** Producing the spec without the visual is exactly the asynchronous-handoff failure mode this skill replaced. For every CUJ, the primary mock must be drawn, iterated, and locked before moving on.
 - **Don't bulk-produce mocks.** One mock per response. Save it; include the absolute file path; describe what you drew; ask for feedback; wait. Bulk = no iteration = the rigidity we eliminated.

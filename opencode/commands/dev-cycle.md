@@ -3,14 +3,13 @@ description: "Run one iteration of the autonomous development loop. Orchestrates
 ---
 <!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
 
-> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
-> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
-> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
-> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
-> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
-> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
-> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
-> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+> **OpenCode runtime notes** — this text was written for Claude Code and adapted for OpenCode; read what remains as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`, and `/loop` is the `loop` command. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments.
+> - "Spawn a `<role>` subagent" → the `subagent` tool with `agent: "<role>"`, a short `description`, and the full prompt; `background: true` when several run at once. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary.
+> - "Spawn all in a single message" → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - Worktrees: OpenCode subagents share your checkout. "Own worktree `.worktrees/<branch>`" means you create it with `git worktree add .worktrees/<branch> -b <branch> HEAD` before the spawn and tell the subagent to work and commit only there; the `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `question` is OpenCode's question tool. A role whose permissions deny it never asks: it returns `BLOCKER:` or files an owner-queue entry, as its text says.
+> - Claude tool names left in prose (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. MCP tools are named `<server>_<tool>`; Playwright's are `playwright_browser_*`, exposed as direct tools because `~/.config/opencode/opencode.json` runs the server with `"codemode": false`.
 
 # Dev Cycle — One Iteration
 
@@ -54,7 +53,7 @@ Run `ls docs/*-guidelines.md 2>/dev/null` to check for guideline files. If any `
 
 ### Worktree Label
 
-Compute a short worktree label so this cycle's subagents are distinguishable from any other Claude sessions running on the same repo (e.g., another `/dev-cycle` running from a different worktree, or the user editing in a parallel window). The label flows into FleetView via each subagent's `description` parameter.
+Compute a short worktree label so this cycle's subagents are distinguishable from any other OpenCode sessions running on the same repo (e.g., another `/dev-cycle` running from a different worktree, or the user editing in a parallel window). The label flows into FleetView via each subagent's `description` parameter.
 
 Steps:
 1. Run `git worktree list --porcelain` and find the entry whose `branch` is `refs/heads/main` (or `refs/heads/master`). The `worktree` line gives the main worktree's absolute path; take its basename — call it `<main-basename>` (e.g., `my_agents`).
@@ -64,7 +63,7 @@ Steps:
    - If `<cwd-basename>` starts with `<main-basename>-`: label is the suffix after the `-` (e.g., `data` for `my_agents-data`, `ui` for `my_agents-ui`).
    - Otherwise: label is `<cwd-basename>` itself (fallback for non-conventional paths).
 
-**Every Agent tool call this skill makes in subsequent phases must prefix its `description` parameter with `<worktree-label>: `.** Examples (running from `my_agents-data`, label = `data`):
+**Every `subagent` tool call this skill makes in subsequent phases must prefix its `description` parameter with `<worktree-label>: `.** Examples (running from `my_agents-data`, label = `data`):
 
 | Without prefix | With prefix |
 |---|---|
@@ -136,7 +135,7 @@ No armed default: a ruling on a requirement is durable — it moves to `docs/rul
 **Who writes.**
 - Shared-checkout subagents (tl, planner, qa, evaluator, researcher, pm): file the entry the moment a non-blocking owner decision surfaces; cite its R-NNN in your own output. This is a **standing write grant**: appending an entry to `docs/owner-queue.md` is part of every listed role's write surface, whatever that role's own write list says. (reporter is not listed: it derives and never decides, so its work never waits on an owner answer.)
 - `docs/rulings.md` is written only by whoever **closes** an entry — the orchestrator's sweep, or an interactive session receiving the owner's answer live. Subagents append to the queue, never to the registry.
-- Orchestrators: register on every `BLOCKER:` return (the only path for worktree agents — coder never writes these files; a branch write dies with a rejected branch), on every `blocked` state write (the Blocker section cites the R-NNN), and **before** asking a decision-class `AskUserQuestion` (answered → transcribe and close the same turn; declined or unanswered → the entry stays). Interactive design/calibration conversations are exempt per-question, but anything still open when the session yields is registered first.
+- Orchestrators: register on every `BLOCKER:` return (the only path for worktree agents — coder never writes these files; a branch write dies with a rejected branch), on every `blocked` state write (the Blocker section cites the R-NNN), and **before** asking a decision-class `question` (answered → transcribe and close the same turn; declined or unanswered → the entry stays). Interactive design/calibration conversations are exempt per-question, but anything still open when the session yields is registered first.
 - The owner: any edit is legal and reads as a ruling. Deleting an entry = decline-to-rule; the default applies.
 
 **Answers and close-time classification.** A conversational answer is transcribed into the entry before anyone acts on it. Closing asks one question: *does this answer govern cases nobody has looked at yet?* Durable → move the entry to `docs/rulings.md` with the Ruling filled. Transient → delete it once the acting track records the outcome. Answers given live in conversation skip the queue entirely (durable → straight into the registry; transient → the acting artifact is the record). "Park" = keep pending with a new trigger. **Arming discipline**: arm a default only when applying it wrongly is cheap to undo — transient items should almost always arm (they go stale; defer/skip is safe); durable rulings rarely should (a class ruling by timeout is a wrong rule silently governing everything downstream).
@@ -173,7 +172,7 @@ Mocks are normally produced during `/design-feature` Phase 0.5 alongside CUJ sha
 
 3. If every in-scope CUJ has at least one matching mock file, print one line ("Mocks present for all in-scope CUJs.") and continue to Phase 1.
 
-4. Otherwise, list the CUJs missing mocks. Per the Owner Decision Protocol, register the choice as a `docs/owner-queue.md` entry first (recommended + default: Proceed — QA logs `NO_MOCK`; arm the default so an unattended loop doesn't hang), then use `AskUserQuestion` to ask the user to choose:
+4. Otherwise, list the CUJs missing mocks. Per the Owner Decision Protocol, register the choice as a `docs/owner-queue.md` entry first (recommended + default: Proceed — QA logs `NO_MOCK`; arm the default so an unattended loop doesn't hang), then use `question` to ask the user to choose:
    - **Proceed without fidelity check** — QA will log `NO_MOCK` for these CUJs and skip visual comparison; functional verification still runs.
    - **Pause** — stop the cycle here so mocks can be produced via `/design-feature` Route D (refine the affected CUJs to add mocks).
 
@@ -284,7 +283,7 @@ Runs when Setup found the plan review **due** and the cycle is **not** in run-th
    >
    > **Your call (R-NNN):** A. Approve · B. Change · C. No pauses for this PRD. No default.
 
-3. **Ask** with `AskUserQuestion` (options A/B/C; the owner can always type free text).
+3. **Ask** with `question` (options A/B/C; the owner can always type free text).
    - **A** → transcribe; mark `C1` reached in the loop-state Checkpoints section; close the entry as a durable ruling (`docs/rulings.md`, `Scope: prd-NNN`, Ruling: "checkpoint ladder approved as of <commit>"); write `Approval: R-NNN (<date>)` on the ladder in `system.md`. Continue to Phase 2 **in this same run**.
    - **B** → take the owner's words, spawn `tl` to amend the design or ladder accordingly, then re-present from step 2. Iterate until A or C.
    - **C** → close as a durable ruling (`Scope: prd-NNN`, Ruling: "no checkpoint pauses; the ladder is a progress map"); write `Approval: run-through R-NNN` in `system.md`; continue to Phase 2 in run-through mode.
@@ -361,9 +360,9 @@ git add -- <paths> && git commit --only -m "<message>" -- <paths>
 ## Phase 3: Task Execution
 
 Run Checkpoint A, then read `docs/tasks.md`. For each parallel group, spawn all tasks simultaneously as background worktree agents:
-- `subagent_type: "coder"` — every task-execution agent uses the `coder` role definition (see `~/.config/opencode/agents/coder.md`). Coders own implementation + unit tests + local verification + commit; they explicitly do not modify PRDs/design docs/task plans and do not write integration/E2E tests (those belong to qa).
-- `isolation: "worktree"` — each agent gets its own branch
-- `run_in_background: true` — parallel execution
+- `agent: "coder"` — every task-execution agent uses the `coder` role definition (see `~/.config/opencode/agents/coder.md`). Coders own implementation + unit tests + local verification + commit; they explicitly do not modify PRDs/design docs/task plans and do not write integration/E2E tests (those belong to qa).
+- own worktree `.worktrees/<branch>` — each agent gets its own branch
+- `background: true` — parallel execution
 - Each agent's prompt must be fully self-contained with task description, file paths, and acceptance criteria
 - If any `docs/*-guidelines.md` files were discovered in Setup, each agent's prompt must include: "Read all docs/*-guidelines.md files before starting. Your code and process must comply with every rule in those documents."
 - Each agent commits its work when done
@@ -521,7 +520,7 @@ Spawn a `pm` subagent:
 Prompt: "Execute Section 6 (Review implemented work) of your role
 definition. Judge every in-scope CUJ against the implementation
 evidence — docs/qa-report.md, QA's walk screenshots under
-docs/qa-artifacts/ (view them with the Read tool), and the code;
+docs/qa-artifacts/ (view them with the `read` tool), and the code;
 produce a product-side judgment per CUJ; write docs/pm-review.md
 following the structure in your role definition.
 
@@ -634,7 +633,6 @@ Every stop runs Checkpoint B before its report — including early `blocked` sto
 - **Status = `continue`**: Report the iteration summary (tasks done, QA verdict, test results, routed issues taken / closed, what remains). The loop continues to the next iteration.
 
 Every exit report — all four statuses, and the eng-wave net line — ends with the owner-queue line from the Setup sweep: `Owner queue: +<n> filed / <m> closed (<k> defaulted) / <j> open (oldest R-NNN, <i> iters)`.
-
 ## OpenCode adaptations
 
 **Phase 3 on OpenCode.** Subagents share this checkout; there is no per-agent worktree isolation. Reproduce it:

@@ -100,6 +100,30 @@ SYNC_BLOCK_RE = re.compile(
 # replaced by user arguments or run as a shell command.
 TEMPLATE_HAZARD_RE = re.compile(r"\$\d|\$ARGUMENTS|!`")
 
+# Claude Code names → OpenCode names. Parameter and tool renames only; behavior that has no
+# OpenCode equivalent is explained in platform-notes.md or an override.
+RENAMES = [
+    ("claude mcp add --scope user playwright -- npx -y @playwright/mcp@latest",
+     '<setup repo>/opencode/deploy.sh   # links ~/.config/opencode/opencode.json: Playwright MCP with "codemode": false'),
+    ("mcp__playwright__", "playwright_"),          # MCP tools are <server>_<tool> with Code Mode off
+    ("subagent_type", "agent"),                    # the subagent tool's parameter
+    ("run_in_background", "background"),
+    ('`isolation: "worktree"`', "own worktree `.worktrees/<branch>`"),
+    ("AskUserQuestion", "question"),
+    ("Agent tool", "`subagent` tool"),
+    ("Read tool", "`read` tool"),
+    ("Claude sessions", "OpenCode sessions"),
+    ("Claude session", "OpenCode session"),
+]
+# Claude permission syntax: `Bash(<pattern>)` is a shell allow rule in opencode.json.
+BASH_RULE_RE = re.compile(r"`Bash\(([^)`]*)\)`")
+
+# Claude-only constructs that must not survive mapping. Checked on everything but the
+# platform notes, which name them on purpose.
+RESIDUE_RE = re.compile(
+    r'subagent_type|run_in_background|isolation: *"worktree"|AskUserQuestion|mcp__|`Bash\(|\bAgent tool\b|\bRead tool\b|claude mcp add'
+)
+
 
 def parse_markdown(path: Path):
     text = path.read_text(encoding="utf-8")
@@ -151,7 +175,9 @@ def map_platform(text: str) -> str:
     Anything semantic that cannot be a textual rewrite is explained once in
     platform-notes.md, which is prepended to every generated artifact."""
     text = apply_sync_overrides(text)
-    text = text.replace("claude mcp add --scope user playwright", "opencode mcp add --global playwright")
+    for old, new in RENAMES:
+        text = text.replace(old, new)
+    text = BASH_RULE_RE.sub(r"`\1` (a `shell` allow rule in opencode.json)", text)
     text = text.replace("~/.claude/commands/", "~/.config/opencode/commands/")
     text = text.replace("~/.claude/agents/", "~/.config/opencode/agents/")
     text = text.replace("~/.claude/", "~/.config/opencode/")
@@ -171,6 +197,15 @@ def platform_override(kind: str, name: str) -> str:
     if path.exists():
         return "\n" + path.read_text(encoding="utf-8").strip() + "\n"
     return ""
+
+
+def assert_native(text: str, origin: str):
+    residue = RESIDUE_RE.search(text)
+    if residue:
+        sys.exit(
+            f"Error: {origin} still contains the Claude-only construct {residue.group(0)!r} after "
+            "mapping. Add a rename, an override, or a SYNC block."
+        )
 
 
 def denied_actions(tools: str):
@@ -196,6 +231,8 @@ def write_agent(src: Path):
     name = metadata.get("name") or src.stem
     description = metadata.get("description", "")
     target = agents_dir / f"{name}.md"
+    mapped = map_platform(body).rstrip() + platform_override("agents", name)
+    assert_native(mapped, f"claude/agents/{src.name}")
     # No `model:` field: a subagent then runs on the model of the session that invoked it.
     frontmatter = ["---", f"description: {yaml_string(description)}", "mode: subagent"]
     denied = denied_actions(metadata.get("tools", ""))
@@ -211,8 +248,7 @@ def write_agent(src: Path):
                 managed_agent_marker,
                 "",
                 notes,
-                map_platform(body).rstrip(),
-                platform_override("agents", name),
+                mapped,
             ]
         ),
         encoding="utf-8",
@@ -230,9 +266,9 @@ def write_command(src: Path):
     name = command_name(src)
     description = metadata.get("description", f"Migrated source command `{src.stem}`.")
     target = commands_dir / f"{name}.md"
-    template = "\n".join(
-        [notes, map_platform(body).rstrip(), platform_override("commands", name)]
-    )
+    mapped = map_platform(body).rstrip() + platform_override("commands", name)
+    assert_native(mapped, f"claude/commands/{src.name}")
+    template = notes + "\n" + mapped
     hazard = TEMPLATE_HAZARD_RE.search(template)
     if hazard:
         sys.exit(
@@ -261,9 +297,10 @@ def write_command(src: Path):
 
 def write_rules(src: Path):
     target = out_dir / "AGENTS.md"
-    body = src.read_text(encoding="utf-8")
+    mapped = map_platform(src.read_text(encoding="utf-8")).rstrip()
+    assert_native(mapped, "claude/CLAUDE.md")
     target.write_text(
-        managed_rules_marker + "\n\n" + notes + "\n" + map_platform(body).rstrip() + "\n",
+        managed_rules_marker + "\n\n" + notes + "\n" + mapped + "\n",
         encoding="utf-8",
     )
     if not check:

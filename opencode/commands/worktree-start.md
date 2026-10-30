@@ -1,16 +1,15 @@
 ---
-description: "Create a new git worktree on a fresh feature branch and open it in a new Antigravity window. Use this to run a parallel Claude session on a different concern (UI, data pipeline, mocks, etc.) without disturbing your current window."
+description: "Create a new git worktree on a fresh feature branch and open it in a new Antigravity window. Use this to run a parallel OpenCode session on a different concern (UI, data pipeline, mocks, etc.) without disturbing your current window."
 ---
 <!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
 
-> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
-> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
-> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
-> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
-> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
-> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
-> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
-> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+> **OpenCode runtime notes** — this text was written for Claude Code and adapted for OpenCode; read what remains as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`, and `/loop` is the `loop` command. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments.
+> - "Spawn a `<role>` subagent" → the `subagent` tool with `agent: "<role>"`, a short `description`, and the full prompt; `background: true` when several run at once. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary.
+> - "Spawn all in a single message" → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - Worktrees: OpenCode subagents share your checkout. "Own worktree `.worktrees/<branch>`" means you create it with `git worktree add .worktrees/<branch> -b <branch> HEAD` before the spawn and tell the subagent to work and commit only there; the `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `question` is OpenCode's question tool. A role whose permissions deny it never asks: it returns `BLOCKER:` or files an owner-queue entry, as its text says.
+> - Claude tool names left in prose (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. MCP tools are named `<server>_<tool>`; Playwright's are `playwright_browser_*`, exposed as direct tools because `~/.config/opencode/opencode.json` runs the server with `"codemode": false`.
 
 # Worktree Start
 
@@ -81,7 +80,7 @@ Tell the user, concisely:
 - New worktree: `<new-worktree-path>`
 - New branch: `feature/<slug>`
 - A new Antigravity window is opening — switch to it to start the new session.
-- When the work is done, run `/worktree-finish` from that window's Claude session to merge back into `main` and clean up.
+- When the work is done, run `/worktree-finish` from that window's OpenCode session to merge back into `main` and clean up.
 
 ## What NOT to do
 
@@ -90,5 +89,8 @@ Tell the user, concisely:
 - Don't run any commits, merges, or pushes — this skill only creates the worktree.
 - Don't reuse a branch name that already exists. Always create a fresh `feature/<slug>` branch.
 - Don't place the new worktree anywhere other than as a sibling of the main worktree — keep the convention so `/worktree-finish` and future tooling can find it predictably.
+## OpenCode adaptations
+
+The new Antigravity window is an editor, not an OpenCode session. In your report, tell the user to start OpenCode in that window's integrated terminal (`opencode`); that session works in the worktree, and `/worktree-finish` runs from it. This session stays where it is.
 
 ARGUMENTS: $ARGUMENTS

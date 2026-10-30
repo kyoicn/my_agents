@@ -3,14 +3,13 @@ description: "Fix a small-scope work item directly — a defect from docs/issues
 ---
 <!-- generated-from: claude/commands — do not edit; regenerate with opencode/skills/sync-from-claude -->
 
-> **OpenCode runtime notes** — this text was written for Claude Code; on OpenCode read it as follows.
-> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments. `/loop /x` means: run `/x` again in this same turn after each stop that is not final, until it reports a stopping status (`checkpoint`, `done`, `blocked`, or the `--until` target).
-> - "Spawn a `<role>` subagent" / `subagent_type: "<role>"` → the `subagent` tool with `agent: "<role>"`, a short `description` (where the text asks for a `description` prefix, put it there), and the full prompt. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary. A subagent cannot start subagents of its own.
-> - "Spawn all in a single message" / `run_in_background: true` → issue every `subagent` call in the same turn, then wait for all their results before going on.
-> - `isolation: "worktree"` → OpenCode subagents share your checkout. Give each one its own `git worktree add .worktrees/<branch> -b <branch>` inside the repo and tell it to work and commit only there; merge, then `git worktree remove`. The `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
-> - `AskUserQuestion` is the `question` tool. Do the registration the text asks for before asking, as written.
-> - Claude tool names (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. Playwright MCP tools (`mcp__playwright__browser_*`) are the `browser_*` tools of the `playwright` MCP server configured in OpenCode, which carry the server's prefix instead.
-> - `~/.claude/agents/*.md` and `~/.claude/commands/*.md` are `~/.config/opencode/agents/*.md` and `~/.config/opencode/commands/*.md`; `CLAUDE.md` is `AGENTS.md` (already rewritten).
+> **OpenCode runtime notes** — this text was written for Claude Code and adapted for OpenCode; read what remains as follows.
+> - Slash commands keep their names: `/dev-cycle` is the OpenCode command `dev-cycle`, and `/loop` is the `loop` command. When the text tells *you* to run a command (for example, run `/loop /dev-cycle` when the owner says "continue"), read `~/.config/opencode/commands/<name>.md` and follow it with the arguments.
+> - "Spawn a `<role>` subagent" → the `subagent` tool with `agent: "<role>"`, a short `description`, and the full prompt; `background: true` when several run at once. The roles are the `~/.config/opencode/agents/*.md` agents: tl, planner, coder, qa, reporter, pm, evaluator, researcher, gorilla. A subagent's final message is its return summary.
+> - "Spawn all in a single message" → issue every `subagent` call in the same turn, then wait for all their results before going on.
+> - Worktrees: OpenCode subagents share your checkout. "Own worktree `.worktrees/<branch>`" means you create it with `git worktree add .worktrees/<branch> -b <branch> HEAD` before the spawn and tell the subagent to work and commit only there; the `/dev-cycle` command's "OpenCode adaptations" section has the full recipe.
+> - `question` is OpenCode's question tool. A role whose permissions deny it never asks: it returns `BLOCKER:` or files an owner-queue entry, as its text says.
+> - Claude tool names left in prose (Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch) are OpenCode's read, grep, glob, edit, shell, websearch, and webfetch tools. MCP tools are named `<server>_<tool>`; Playwright's are `playwright_browser_*`, exposed as direct tools because `~/.config/opencode/opencode.json` runs the server with `"codemode": false`.
 
 # Quick Fix
 
@@ -36,7 +35,7 @@ If the issue block already has a `Triage` field (because `/triage` ran on it), u
 
 If the issue hasn't been triaged yet:
 - Read the relevant source code and CUJs
-- **If the block has a `Screenshots` field, read each screenshot with the Read tool** for visual context before diagnosing.
+- **If the block has a `Screenshots` field, read each screenshot with the `read` tool** for visual context before diagnosing.
 - Identify root cause, files involved, and scope — classify with `/triage`'s full scope table (all seven scopes, including spec-stale and quality)
 
 If the scope (existing or freshly derived) is anything but small or medium, **route it instead of fixing it** — you're the one the user asked, so the handoff happens here, not as a refusal: write the Triage field onto the issue block (Route included, per `/triage` Step 4) and follow `/triage` Step 5. Run-now routes (`/spec-sync`, `/design-feature`, the spec-conflict question) continue in this session; queued routes (large → `/dev-cycle`, quality → `/quality-cycle`) are recorded, and you tell the user where the item went.

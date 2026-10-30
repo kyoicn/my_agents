@@ -108,7 +108,7 @@ Adopting an existing codebase? Run `/organize-project` once to retrofit it into 
 | **Claude Code** | [`claude/`](claude/) | Full setup — source of truth |
 | **OpenAI Codex** | [`codex/`](codex/) | Full setup, generated from the Claude source by `codex/skills/sync-from-claude` (custom agents as TOML, skills, AGENTS.md) |
 | **Google Antigravity** | [`antigravity/`](antigravity/) | Full setup, generated from the Claude source by `antigravity/skills/sync-from-claude` (custom agents, skills, GEMINI.md) |
-| **OpenCode** | [`opencode/`](opencode/) | Full setup, generated from the Claude source by `opencode/skills/sync-from-claude` (agents, commands, AGENTS.md) |
+| **OpenCode** | [`opencode/`](opencode/) | Full setup, generated from the Claude source by `opencode/skills/sync-from-claude` (agents, commands, AGENTS.md, opencode.json) |
 
 Each directory has its own `deploy.sh`. The Claude Code setup is canonical. The ports are regenerated deterministically: after any change under `claude/`, run all three sync scripts and commit `codex/`, `antigravity/`, and `opencode/` in the same commit:
 

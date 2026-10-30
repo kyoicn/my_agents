@@ -6,19 +6,22 @@ set -euo pipefail
 #   commands/<name>.md  -> ~/.config/opencode/commands/<name>.md
 #   skills/<name>/      -> ~/.config/opencode/skills/<name>/
 #   AGENTS.md           -> ~/.config/opencode/AGENTS.md (global rules)
+#   opencode.json       -> ~/.config/opencode/opencode.json (MCP servers, permission rules)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 OC_AGENTS_DIR="$SCRIPT_DIR/agents"
 OC_COMMANDS_DIR="$SCRIPT_DIR/commands"
 OC_SKILLS_DIR="$SCRIPT_DIR/skills"
 OC_RULES="$SCRIPT_DIR/AGENTS.md"
+OC_CONFIG="$SCRIPT_DIR/opencode.json"
 TARGET_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
 TARGET_AGENTS_DIR="$TARGET_DIR/agents"
 TARGET_COMMANDS_DIR="$TARGET_DIR/commands"
 TARGET_SKILLS_DIR="$TARGET_DIR/skills"
 TARGET_RULES="$TARGET_DIR/AGENTS.md"
+TARGET_CONFIG="$TARGET_DIR/opencode.json"
 
-echo "Deploying OpenCode agents, commands, skills, and AGENTS.md via symlinks..."
+echo "Deploying OpenCode agents, commands, skills, AGENTS.md, and opencode.json via symlinks..."
 echo "Source: $SCRIPT_DIR"
 echo "Target: $TARGET_DIR"
 echo ""
@@ -88,13 +91,19 @@ if compgen -G "$OC_SKILLS_DIR/*" > /dev/null; then
   done
 fi
 
-# AGENTS.md: keep a hand-written, non-empty file as a dated backup before linking.
-if [[ -f "$TARGET_RULES" && ! -L "$TARGET_RULES" && -s "$TARGET_RULES" ]]; then
-  backup="$TARGET_RULES.bak-$(date +%Y%m%d)"
-  mv "$TARGET_RULES" "$backup"
-  echo "  BACKUP $TARGET_RULES -> $backup"
-fi
+# AGENTS.md and opencode.json: keep a hand-written, non-empty file as a dated backup before linking.
+backup_hand_written() {
+  local dst="$1"
+  if [[ -f "$dst" && ! -L "$dst" && -s "$dst" ]]; then
+    local backup="$dst.bak-$(date +%Y%m%d)"
+    mv "$dst" "$backup"
+    echo "  BACKUP $dst -> $backup"
+  fi
+}
+backup_hand_written "$TARGET_RULES"
 link_item "$OC_RULES" "$TARGET_RULES" "AGENTS.md"
+backup_hand_written "$TARGET_CONFIG"
+link_item "$OC_CONFIG" "$TARGET_CONFIG" "opencode.json"
 
 echo ""
 echo "Done."
